@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
+import { HttpException } from '@nestjs/common';
 import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import cookie from '@fastify/cookie';
@@ -12,7 +13,11 @@ async function bootstrap() {
   const app = await NestFactory.create<NestFastifyApplication>(AppModule, new FastifyAdapter({ bodyLimit: 512 * 1024, trustProxy: false }));
   await app.register(cookie);
   await app.register(helmet, { contentSecurityPolicy: false });
-  await app.register(rateLimit, { max: 300, timeWindow: '1 minute' });
+  await app.register(rateLimit, {
+    max: 300, timeWindow: '1 minute',
+    // Nest's exception filter must preserve the plugin's rejection status and Retry-After headers.
+    errorResponseBuilder: (_request, context) => new HttpException('Слишком много запросов. Попробуйте позже.', context.statusCode),
+  });
   app.setGlobalPrefix('api');
   app.useGlobalFilters(new ApiErrors());
   app.enableShutdownHooks();

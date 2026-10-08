@@ -18,6 +18,7 @@ import { MoneyChart } from '../features/money-chart';
 import { ClientDirectory, OrderDirectory } from '../features/directories';
 import { AuditTrail } from '../features/audit-trail';
 import { Editor } from '../features/editor';
+import { AccountSecurity } from '../features/account-security';
 import { OrganizationSettings } from '../features/organization-settings';
 import type { Section, Modal } from '../types/workspace';
 export default function Workspace() {
@@ -109,7 +110,7 @@ const navigation = [
       {section === 'history' && <AuditTrail revision={data}/>}
       {section === 'finances' && <FinanceReport revision={data} onOrder={id=>openOrder({id})}/>}
       {section === 'documents' && <DocumentDirectory revision={data}/>}
-      {section === 'settings' && <OrganizationSettings onSaved={async () => { setUser(await api<SessionUser>('/auth/me')); setToast(t("Реквизиты сохранены")); }} />}
+      {section === 'settings' && <div className="settings-space"><OrganizationSettings onSaved={async () => { setUser(await api<SessionUser>('/auth/me')); setToast(t("Реквизиты сохранены")); }} /><AccountSecurity onSessionEnded={expired=>{setUser(null);setData(emptyData);setError(expired?'Сессия истекла. Войдите снова':'');}}/></div>}
 <footer className="page-footer"><span>{t("Tirek · опора вашего бизнеса")}</span><span>{refreshing ? t("Обновляем данные…") : t("Демонстрационные данные вымышлены")}</span></footer>
     </main></div>
     {toast && <div className="toast" role="status"><CheckCircle2 size={19} />{t(toast)}</div>}

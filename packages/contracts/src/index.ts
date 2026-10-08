@@ -66,7 +66,7 @@ export const listQuerySchema = z.object({
 });
 export const orderQuerySchema = listQuerySchema.extend({ status: z.enum(stages).optional() });
 export const auditQuerySchema = listQuerySchema.omit({ q:true }).extend({
-  entityType: z.enum(['ORDER','CLIENT','ORGANIZATION','PAYMENT','EXPENSE','DOCUMENT','TASK','TEAM']).optional(),
+  entityType: z.enum(['ORDER','CLIENT','ORGANIZATION','PAYMENT','EXPENSE','DOCUMENT','TASK','TEAM','ACCOUNT']).optional(),
   entityId: z.uuid().optional(),
 });
 export const updateOrderSchema = orderSchema.extend({ version:z.number().int().min(1) });
@@ -119,3 +119,8 @@ export const documentQuerySchema=listQuerySchema.extend(periodFields).strict()
 export type MovementQuery=z.infer<typeof movementQuerySchema>;
 export type DocumentQuery=z.infer<typeof documentQuerySchema>;
 export interface MovementPage extends PageResult<Movement> {summary:{received:string;expenses:string;cashFlow:string}}
+
+export const passwordChangeSchema=z.object({
+ currentPassword:z.string().min(1).max(128),newPassword:z.string().min(12).max(128),
+}).strict();
+export interface AccountSession {id:string;createdAt:string|null;expiresAt:string;userAgent:string;current:boolean}

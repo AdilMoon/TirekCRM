@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../../database/database.module';
 import { AuthModule } from '../../auth/auth.module';
-import { AuditService } from './audit.service';
+import { AuditWriterModule } from './audit-writer.module';
 import { AuditController } from './audit.controller';
-@Module({imports:[DatabaseModule,AuthModule],controllers:[AuditController],providers:[AuditService],exports:[AuditService]})
+@Module({imports:[DatabaseModule,AuditWriterModule,AuthModule],controllers:[AuditController],exports:[AuditWriterModule]})
 export class AuditModule {}

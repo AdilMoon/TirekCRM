@@ -48,3 +48,6 @@ npm run test:integration покрывает изоляцию компаний, �
 Добавлены TeamModule и TasksModule. Эндпоинты, роли, поля и приглашения описаны в [team-and-tasks.md](team-and-tasks.md). SessionUser теперь содержит id и фактическую роль. Записи TASK и TEAM доступны в общем журнале владельца.
 
 ReportsModule — финансовые отчёты и поиск по снимкам документов. [API и ограничения](financial-reports.md), [адверсариальное ревью](reviews/2026-10-08-financial-reports.md).
+
+## Безопасность аккаунта
+AuthService отвечает за атомарную смену пароля, выпуск и отзыв сеансов; AuditWriterModule разделяет запись аудита и защищённый контроллер истории. Добавлены GET /auth/sessions, POST /auth/password, DELETE /auth/sessions/:id и POST /auth/sessions/revoke-others. Обе роли управляют только собственными входами. События ACCOUNT доступны владельцу в фильтре истории. [Контракты, миграция и ограничения](account-security.md).

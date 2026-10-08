@@ -7,11 +7,11 @@
 | backend/src/main.ts | Только запуск и настройка HTTP-сервера |
 | backend/src/app.module.ts | Подключение модулей авторизации, CRM, команды, задач и базы |
 | backend/src/modules/crm | HTTP-контроллер, SearchService и бизнес-операции CRM |
-| backend/src/auth | AuthModule: вход/выход, сессии, хеширование паролей и Origin |
+| backend/src/auth | AuthModule/AuthService: вход/выход, смена пароля, отзыв сеансов; SessionGuard и Origin |
 | backend/src/modules/team | Приглашения, сотрудники и управление доступом |
 | backend/src/modules/reports | Фильтры, объединённый финансовый отчёт и поиск документов |
 | backend/src/modules/tasks | Назначения, сроки, версии и разрешённые переходы |
-| backend/src/modules/audit | AuditModule: атомарная запись и постраничная история |
+| backend/src/modules/audit | AuditWriterModule: запись событий без зависимости от AuthModule; AuditModule: защищённое чтение истории |
 | backend/src/database | Подключение PostgreSQL через Prisma |
 | backend/src/common | Обработка ошибок, точная денежная арифметика |
 | backend/prisma | Схема БД и версионированные миграции |
@@ -46,3 +46,5 @@
 Подробная [матрица прав и API](team-and-tasks.md). Сотрудник видит отдельное рабочее пространство задач. Права на каждом защищённом маршруте проверяет SessionGuard; чтение и изменение задач дополнительно ограничены организацией и исполнителем.
 
 По запросу пользователя после каждой итерации проводится адверсариальное ревью. Правило закреплено в AGENTS.md; результаты и воспроизводимые дефекты — в docs/reviews/.
+
+Управление собственным аккаунтом доступно обеим ролям через frontend/features/account-security.tsx. Запись аудита выделена в AuditWriterModule, чтобы AuthModule мог записывать события без циклического импорта. Контракты и ограничения описаны в [account-security.md](account-security.md).

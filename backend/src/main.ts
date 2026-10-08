@@ -1,0 +1,25 @@
+import 'reflect-metadata';
+import { NestFactory } from '@nestjs/core';
+import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import cookie from '@fastify/cookie';
+import helmet from '@fastify/helmet';
+import rateLimit from '@fastify/rate-limit';
+import { AppModule } from './app.module';
+import { ApiErrors } from './common/api-errors.filter';
+async function bootstrap() {
+  if (process.env.NODE_ENV === 'production' && process.env.DEMO_SEED === 'true') throw new Error('Demo configuration must not run in production');
+  const app = await NestFactory.create<NestFastifyApplication>(AppModule, new FastifyAdapter({ bodyLimit: 512 * 1024, trustProxy: false }));
+  await app.register(cookie);
+  await app.register(helmet, { contentSecurityPolicy: false });
+  await app.register(rateLimit, { max: 300, timeWindow: '1 minute' });
+  app.setGlobalPrefix('api');
+  app.useGlobalFilters(new ApiErrors());
+  app.enableShutdownHooks();
+  if (process.env.NODE_ENV !== 'production') {
+    const doc = SwaggerModule.createDocument(app, new DocumentBuilder().setTitle('Tirek CRM API').setVersion('0.1.0').addCookieAuth('tirek_session').build());
+    SwaggerModule.setup('api/docs', app, doc, { ui: false, jsonDocumentUrl: 'api/openapi.json' });
+  }
+  await app.listen(Number(process.env.API_PORT ?? 4000), process.env.API_HOST ?? '127.0.0.1');
+}
+bootstrap().catch(error => { console.error(error); process.exitCode = 1; });

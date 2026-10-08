@@ -1,0 +1,204 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+}
+enum OrderStatus {
+  NEW
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+enum UserRole {
+  OWNER
+  EMPLOYEE
+}
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+  CANCELLED
+}
+model Organization {
+  id           String @id @default(uuid()) @db.Uuid
+  name         String
+  currency     String @default("KZT")
+  address      String @default("")
+  businessId   String @default("")
+  auditEvents  AuditEvent[]
+  invitations  Invitation[]
+  tasks        BusinessTask[]
+  orderSeq     Int @default(0)
+  documentSeq  Int @default(0)
+  users        User[]
+  clients      Client[]
+  orders       Order[]
+  payments     Payment[]
+  expenses     Expense[]
+  documents    Document[]
+}
+model User {
+  id             String @id @default(uuid()) @db.Uuid
+  email          String @unique
+  name           String
+  passwordHash   String
+  role           UserRole @default(EMPLOYEE)
+  isActive       Boolean @default(true)
+  version        Int @default(1)
+  assignedTasks  BusinessTask[]
+  organizationId String @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  sessions       Session[]
+  @@unique([id, organizationId])
+}
+model Session {
+  tokenHash String @id
+  userId    String @db.Uuid
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  @@index([expiresAt])
+}
+model Client {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  phone          String @default("")
+  email          String @default("")
+  company        String @default("")
+  address        String @default("")
+  createdAt      DateTime @default(now())
+  orders         Order[]
+  @@unique([id, organizationId])
+  @@index([organizationId, createdAt])
+  @@index([organizationId, createdAt, id])
+}
+model Order {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  clientId       String @db.Uuid
+  client         Client @relation(fields: [clientId, organizationId], references: [id, organizationId])
+  number         Int
+  title          String
+  status         OrderStatus @default(NEW)
+  version        Int @default(1)
+  total          Decimal @db.Decimal(18,2)
+  dueDate        DateTime? @db.Date
+  notes          String @default("")
+  createdAt      DateTime @default(now())
+  items          OrderItem[]
+  payments       Payment[]
+  expenses       Expense[]
+  documents      Document[]
+  tasks          BusinessTask[]
+  @@unique([organizationId, number])
+  @@unique([id, organizationId])
+  @@index([organizationId, status, createdAt])
+  @@index([organizationId, createdAt, id])
+}
+model OrderItem {
+  id          String @id @default(uuid()) @db.Uuid
+  orderId     String @db.Uuid
+  order       Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  description String
+  quantity    Int
+  unitPrice   Decimal @db.Decimal(18,2)
+  total       Decimal @db.Decimal(18,2)
+}
+model Payment {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  orderId        String @db.Uuid
+  order          Order @relation(fields: [orderId, organizationId], references: [id, organizationId])
+  amount         Decimal @db.Decimal(18,2)
+  note           String @default("")
+  idempotencyKey String @db.Uuid
+  createdAt      DateTime @default(now())
+  @@unique([organizationId, idempotencyKey])
+  @@index([organizationId, createdAt])
+  @@index([organizationId, createdAt, id])
+}
+model Expense {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  orderId        String? @db.Uuid
+  order          Order? @relation(fields: [orderId, organizationId], references: [id, organizationId])
+  amount         Decimal @db.Decimal(18,2)
+  description    String
+  category       String
+  idempotencyKey String @db.Uuid
+  createdAt      DateTime @default(now())
+  @@unique([organizationId, idempotencyKey])
+  @@index([organizationId, createdAt])
+  @@index([organizationId, createdAt, id])
+}
+model Document {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  orderId        String @db.Uuid
+  order          Order @relation(fields: [orderId, organizationId], references: [id, organizationId])
+  number         Int
+  kind           String @default("ACT_DRAFT")
+  snapshot       Json
+  createdAt      DateTime @default(now())
+  @@unique([organizationId, number])
+  @@index([organizationId, createdAt])
+  @@index([organizationId, createdAt, id])
+}
+
+model AuditEvent {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actorId        String @db.Uuid
+  actorName      String
+  entityType     String
+  entityId       String @db.Uuid
+  action         String
+  metadata       Json
+  createdAt      DateTime @default(now())
+  @@index([organizationId, createdAt, id])
+  @@index([organizationId, entityType, entityId, createdAt])
+}
+
+model Invitation {
+ id             String @id @default(uuid()) @db.Uuid
+ organizationId String @db.Uuid
+ organization   Organization @relation(fields:[organizationId],references:[id],onDelete:Cascade)
+ email          String
+ name           String
+ tokenHash      String @unique
+ invitedById    String @db.Uuid
+ expiresAt      DateTime
+ acceptedAt     DateTime?
+ revokedAt      DateTime?
+ createdAt      DateTime @default(now())
+ @@index([organizationId, createdAt, id])
+ @@index([organizationId, email])
+}
+model BusinessTask {
+ id             String @id @default(uuid()) @db.Uuid
+ organizationId String @db.Uuid
+ organization   Organization @relation(fields:[organizationId],references:[id],onDelete:Cascade)
+ title          String
+ description    String @default("")
+ status         TaskStatus @default(TODO)
+ version        Int @default(1)
+ dueDate        DateTime? @db.Date
+ assigneeId     String @db.Uuid
+ assignee       User @relation(fields:[assigneeId,organizationId],references:[id,organizationId],onDelete:Restrict)
+ orderId        String? @db.Uuid
+ order          Order? @relation(fields:[orderId,organizationId],references:[id,organizationId],onDelete:Restrict)
+ createdById    String @db.Uuid
+ createdAt      DateTime @default(now())
+ updatedAt      DateTime @updatedAt
+ @@index([organizationId, status, createdAt, id])
+ @@index([organizationId, assigneeId, status])
+ @@index([organizationId, orderId])
+}

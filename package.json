@@ -1,0 +1,33 @@
+{
+  "name": "tirek-crm",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "frontend",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "setup": "node scripts/setup.mjs",
+    "db:local": "node scripts/postgres.mjs",
+    "db:generate": "npm run db:generate -w @tirek/api",
+    "db:migrate": "npm run db:migrate -w @tirek/api",
+    "db:seed": "npm run db:seed -w @tirek/api",
+    "build": "npm run build -w @tirek/contracts && npm run build -w @tirek/api && npm run build -w @tirek/web",
+    "dev": "node scripts/dev.mjs",
+    "typecheck": "npm run build -w @tirek/contracts && npm run typecheck -w @tirek/api && npm run typecheck -w @tirek/web",
+    "test": "npm run build -w @tirek/contracts && npm run test -w @tirek/api && npm run test:i18n",
+    "test:integration": "node --test --test-concurrency=1 tests/*.integration.mjs",
+    "test:e2e": "playwright test",
+    "check:structure": "node scripts/check-structure.mjs",
+    "test:i18n": "node --test tests/localization.test.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.0",
+    "embedded-postgres": "18.4.0-beta.17",
+    "typescript": "^5.9.3"
+  }
+}

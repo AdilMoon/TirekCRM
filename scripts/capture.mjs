@@ -1,0 +1,38 @@
+import 'dotenv/config';
+import { chromium, expect } from '@playwright/test';
+import { mkdir } from 'node:fs/promises';
+await mkdir('.local/qa', { recursive:true });
+const browser=await chromium.launch({channel:process.env.PLAYWRIGHT_CHANNEL||'chrome',headless:true});
+try {
+ const page=await browser.newPage({viewport:{width:1440,height:1080}});
+ const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.goto('http://localhost:3000');
+ await page.getByLabel('Пароль',{exact:true}).fill(process.env.DEMO_PASSWORD);
+ await page.getByRole('button',{name:'Войти в пространство'}).click();
+ await page.getByRole('heading',{name:'Всё под контролем.'}).waitFor();
+ await page.getByRole('heading',{name:'Движение денег'}).waitFor();
+ await page.screenshot({path:'.local/qa/overview-ru.png',fullPage:true,animations:'disabled'});
+ await page.getByRole('combobox',{name:'Язык интерфейса'}).selectOption('en');
+ await page.getByRole('heading',{name:'Everything under control.'}).waitFor();
+ await page.screenshot({path:'.local/qa/overview-en.png',fullPage:true,animations:'disabled'});
+ await page.getByRole('combobox',{name:'Interface language'}).selectOption('kk');
+ await page.setViewportSize({width:390,height:844});
+ await page.getByRole('heading',{name:'Барлығы бақылауда.'}).waitFor();
+ await expect(page.locator('html')).toHaveAttribute('lang','kk');
+ if(await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth))throw Error('Mobile horizontal overflow');
+ await page.screenshot({path:'.local/qa/overview-kk-mobile.png',fullPage:true,animations:'disabled'});
+ await page.getByRole('button',{name:'Мәзір',exact:true}).click();
+ await page.getByRole('button',{name:'Баптаулар',exact:true}).click();
+ await page.getByLabel('Компания атауы *',{exact:true}).waitFor();
+ await page.screenshot({path:'.local/qa/settings-kk-mobile.png',fullPage:true,animations:'disabled'});
+ await page.setViewportSize({width:1440,height:1080});
+ await page.getByRole('button',{name:'Құжаттар',exact:true}).click();
+ const [doc]=await Promise.all([page.waitForEvent('popup'),page.getByRole('link',{name:'Ашу',exact:true}).first().click()]);
+ doc.on('pageerror',e=>errors.push(e.message));
+ await doc.getByRole('heading',{name:'Орындалған жұмыстар актісі'}).waitFor();
+ await doc.getByRole('combobox',{name:'Интерфейс тілі'}).selectOption('en');
+ await doc.getByRole('heading',{name:'Work completion act'}).waitFor();
+ await doc.screenshot({path:'.local/qa/document-en.png',fullPage:true,animations:'disabled'});
+ console.log(JSON.stringify({browserErrors:errors,screenshots:'.local/qa'}));
+ if(errors.length)process.exitCode=1;
+} finally {await browser.close();}

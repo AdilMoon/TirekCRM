@@ -1,0 +1,19 @@
+{
+  "name": "@tirek/api", "version": "0.1.0", "private": true,
+  "scripts": {
+    "build": "tsc -p tsconfig.json", "typecheck": "tsc --noEmit",
+    "dev": "node --env-file=../.env --watch dist/main.js",
+    "dev:compile": "tsc --watch --preserveWatchOutput",
+    "start": "node dist/main.js",
+    "db:generate": "prisma generate", "db:migrate": "prisma migrate deploy",
+    "db:seed": "node --env-file=../.env dist/seed.js",
+    "test": "npm run build && node --test dist/common/money.test.js"
+  },
+  "dependencies": {
+    "@nestjs/common": "12.1.2", "@nestjs/core": "12.1.2", "@nestjs/platform-fastify": "12.1.2",
+    "@nestjs/swagger": "12.0.2", "@fastify/cookie": "^11.0.2", "@fastify/helmet": "^13.0.2",
+    "@fastify/rate-limit": "^10.3.0", "@prisma/client": "7.10.0", "@prisma/adapter-pg": "7.10.0",
+    "@tirek/contracts": "0.1.0", "pg": "^8.16.3", "reflect-metadata": "^0.2.2", "rxjs": "^7.8.2", "dotenv": "^17.2.3"
+  },
+  "devDependencies": { "@types/node": "^22.18.0", "@types/pg": "^8.15.5", "prisma": "7.10.0" }
+}

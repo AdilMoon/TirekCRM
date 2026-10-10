@@ -130,6 +130,7 @@ test('three languages persist and company details can be edited without losing f
   await doc.close();
   await page.getByRole('combobox',{name:'Interface language'}).selectOption('ru');
   await page.getByRole('button',{name:'Выйти',exact:true}).click();
+  await page.getByLabel('Email',{exact:true}).fill(email);
   await page.getByLabel('Пароль',{exact:true}).fill('incorrect');
   await page.getByRole('button',{name:'Войти в пространство',exact:true}).click();
   await expect(page.locator('form').getByRole('alert')).toHaveText('Неверный email или пароль');

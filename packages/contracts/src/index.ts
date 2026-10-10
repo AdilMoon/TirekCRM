@@ -124,3 +124,12 @@ export const passwordChangeSchema=z.object({
  currentPassword:z.string().min(1).max(128),newPassword:z.string().min(12).max(128),
 }).strict();
 export interface AccountSession {id:string;createdAt:string|null;expiresAt:string;userAgent:string;current:boolean}
+
+const registrationName=(max:number)=>z.string().trim().min(1).max(max).refine(value=>!/[\u0000-\u001f\u007f]/.test(value));
+export const registrationSchema=z.object({
+ companyName:registrationName(160),ownerName:registrationName(160),
+ email:z.string().trim().toLowerCase().pipe(z.email().max(254)),
+ password:z.string().min(12).max(128),
+}).strict();
+export type RegistrationInput=z.infer<typeof registrationSchema>;
+export interface RegistrationStatus {registrationEnabled:boolean}

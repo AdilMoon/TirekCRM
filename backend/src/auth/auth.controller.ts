@@ -7,9 +7,7 @@ import { loginSchema,passwordChangeSchema } from '@tirek/contracts';
 import { Database } from '../database/database.service';
 import { AuthRequest,SessionGuard,digest } from './session.guard';
 import { AuthService,cleanUserAgent } from './auth.service';
-function setSession(reply:FastifyReply,session:{token:string;expiresAt:Date}){
- reply.setCookie('tirek_session',session.token,{path:'/',httpOnly:true,sameSite:'lax',secure:process.env.NODE_ENV==='production',expires:session.expiresAt});
-}
+import { setSessionCookie } from './session';
 @ApiTags('Authentication')
 @Controller('auth')
 @UseGuards(SessionGuard)
@@ -19,7 +17,7 @@ export class AuthController {
  @RouteConfig({rateLimit:{max:10,timeWindow:'1 minute'}})
  async login(@Body() body:unknown,@Req() req:AuthRequest,@Res({passthrough:true}) reply:FastifyReply){
   const input=loginSchema.parse(body);
-  setSession(reply,await this.auth.login(input.email,input.password,cleanUserAgent(req.headers['user-agent'])));
+  setSessionCookie(reply,await this.auth.login(input.email,input.password,cleanUserAgent(req.headers['user-agent'])));
   return {ok:true};
  }
  @EmployeeAccess() @Post('logout')
@@ -38,7 +36,7 @@ export class AuthController {
  @RouteConfig({rateLimit:{max:5,timeWindow:'1 minute'}})
  async password(@Req() req:AuthRequest,@Body() body:unknown,@Res({passthrough:true}) reply:FastifyReply){
   const input=passwordChangeSchema.parse(body);
-  setSession(reply,await this.auth.changePassword(req.user,digest(req.cookies.tirek_session!),input.currentPassword,input.newPassword,cleanUserAgent(req.headers['user-agent'])));
+  setSessionCookie(reply,await this.auth.changePassword(req.user,digest(req.cookies.tirek_session!),input.currentPassword,input.newPassword,cleanUserAgent(req.headers['user-agent'])));
   return {ok:true};
  }
  @EmployeeAccess() @Post('sessions/revoke-others')

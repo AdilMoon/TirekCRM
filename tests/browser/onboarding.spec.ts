@@ -1,0 +1,124 @@
+import { test,expect } from '@playwright/test';
+import 'dotenv/config';
+import { randomUUID } from 'node:crypto';
+import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+
+const db=new PrismaClient({adapter:new PrismaPg({connectionString:process.env.DATABASE_URL})});
+const prefix='Onboarding browser '+randomUUID(),password='OnboardingBrowser2026!';
+test.afterAll(async()=>{
+ const ids=(await db.organization.findMany({where:{name:{startsWith:prefix}},select:{id:true}})).map(o=>o.id);
+ await db.client.deleteMany({where:{organizationId:{in:ids}}});
+ await db.user.deleteMany({where:{organizationId:{in:ids}}});
+ await db.organization.deleteMany({where:{id:{in:ids}}});
+ await db.$disconnect();
+});
+test('owner creates a company in three languages and starts with a clean workspace on mobile',async({page,context})=>{
+ test.setTimeout(60000);
+ const email=randomUUID()+'@onboarding-browser.invalid',name=prefix+' '+'Қ'.repeat(90);
+ await page.setViewportSize({width:390,height:844});
+ await page.goto('/');
+ await expect(page.getByLabel('Email',{exact:true})).toHaveValue('');
+ await page.getByRole('link',{name:'Создать пространство компании',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Создать пространство компании'})).toBeVisible();
+ await page.getByLabel('Название компании *',{exact:true}).fill(name);
+ await page.getByLabel('Ваше имя *',{exact:true}).fill('Onboarding owner');
+ await page.getByLabel('Email',{exact:true}).fill(email);
+ await page.getByLabel('Новый пароль',{exact:true}).fill(password);
+ await page.getByLabel('Повторите пароль',{exact:true}).fill(password+'different');
+ await page.getByRole('button',{name:'Создать компанию',exact:true}).click();
+ await expect(page.locator('form').getByRole('alert')).toHaveText('Пароли не совпадают');
+ await page.getByLabel('Повторите пароль',{exact:true}).fill(password);
+ await page.getByRole('combobox',{name:'Язык интерфейса'}).selectOption('kk');
+ await expect(page.getByLabel('Компания атауы *',{exact:true})).toHaveValue(name);
+ await page.getByRole('combobox',{name:'Интерфейс тілі'}).selectOption('en');
+ await expect(page.getByLabel('Your name *',{exact:true})).toHaveValue('Onboarding owner');
+ await page.route('**/api/onboarding/register',route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({message:'Не удалось связаться с сервером'})}));
+ await page.getByRole('button',{name:'Create company',exact:true}).click();
+ await expect(page.locator('form').getByRole('alert')).toBeVisible();
+ await expect(page.getByLabel('Company name *',{exact:true})).toHaveValue(name);
+ expect(await db.organization.count({where:{name}})).toBe(0);
+ await page.unroute('**/api/onboarding/register');
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.screenshot({path:'test-results/registration-mobile.png',fullPage:true,animations:'disabled'});
+ await page.getByRole('button',{name:'Create company',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Everything under control.'})).toBeVisible();
+ const setup=page.getByRole('region',{name:'First steps in Tirek'});
+ await expect(setup).toBeVisible();
+ await expect(page.getByText('Demo workspace',{exact:true})).toHaveCount(0);
+ expect((await context.cookies()).find(c=>c.name==='tirek_session')?.httpOnly).toBe(true);
+ const user=await db.user.findUniqueOrThrow({where:{email},include:{organization:true}});
+ expect(user.role).toBe('OWNER');expect(user.organization.name).toBe(name);
+ expect(await db.client.count({where:{organizationId:user.organizationId}})).toBe(0);
+ await setup.getByRole('button',{name:'Open settings',exact:true}).click();
+ await expect(page.getByLabel('Company name *',{exact:true})).toHaveValue(name);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.getByLabel('Address',{exact:true}).fill('Almaty, onboarding fixture');
+ await page.getByRole('button',{name:'Save company details',exact:true}).click();
+ await page.getByRole('button',{name:'Menu',exact:true}).click();
+ await page.getByRole('button',{name:'Overview',exact:true}).click();
+ await setup.getByRole('button',{name:'Open team',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Team',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Menu',exact:true}).click();
+ await page.getByRole('button',{name:'Overview',exact:true}).click();
+ await expect(page.locator('.sidebar')).not.toHaveClass(/is-open/);
+ await page.screenshot({path:'test-results/getting-started-mobile.png',fullPage:true,animations:'disabled'});
+ await page.setViewportSize({width:1280,height:900});
+ await setup.screenshot({path:'test-results/getting-started-desktop.png',animations:'disabled'});
+ await page.setViewportSize({width:390,height:844});
+ await setup.getByRole('button',{name:'Add client',exact:true}).click();
+ await page.getByLabel('Client name *',{exact:true}).fill('First onboarding client');
+ await page.getByRole('button',{name:'Save',exact:true}).click();
+ await expect(page.getByRole('dialog')).toHaveCount(0);
+ await expect(setup).toHaveCount(0);
+ await page.reload();
+ await expect(page.getByRole('heading',{name:'Everything under control.'})).toBeVisible();
+ expect(await db.client.count({where:{organizationId:user.organizationId}})).toBe(1);
+ await page.goto('/register');
+ await expect(page.getByRole('link',{name:'Open workspace',exact:true})).toBeVisible();
+ await expect(page.locator('form')).toHaveCount(0);
+});
+
+test('a lost registration response can be recovered by signing in without creating another company',async({page})=>{
+ test.setTimeout(60000);
+ const email=randomUUID()+'@onboarding-browser.invalid',name=prefix+' Lost response';
+ await page.goto('/register');
+ await page.getByLabel('Название компании *',{exact:true}).fill(name);
+ await page.getByLabel('Ваше имя *',{exact:true}).fill('Owner');
+ await page.getByLabel('Email',{exact:true}).fill(email);
+ await page.getByLabel('Новый пароль',{exact:true}).fill(password);
+ await page.getByLabel('Повторите пароль',{exact:true}).fill(password);
+ await page.route('**/api/onboarding/register',async route=>{
+  // Perform the real transaction outside the browser cookie jar, then lose its HTTP response.
+  const response=await fetch((process.env.TEST_API_URL??'http://127.0.0.1:4000/api')+'/onboarding/register',{
+   method:'POST',headers:{Origin:process.env.WEB_ORIGIN??'http://localhost:3000','Content-Type':'application/json'},body:route.request().postData()!,
+  });
+  expect(response.status).toBe(201);await route.abort('failed');
+ });
+ await page.getByRole('button',{name:'Создать компанию',exact:true}).click();
+ await expect(page.locator('form').getByRole('alert')).toHaveText('Не удалось связаться с сервером');
+ await page.unroute('**/api/onboarding/register');
+ await page.getByRole('button',{name:'Создать компанию',exact:true}).click();
+ await expect(page.locator('form').getByRole('alert')).toHaveText('Не удалось создать пространство. Если аккаунт уже есть, войдите.');
+ expect(await db.organization.count({where:{name}})).toBe(1);
+ await page.getByRole('link',{name:'Уже есть аккаунт? Войти',exact:true}).click();
+ await page.getByLabel('Email',{exact:true}).fill(email);
+ await page.getByLabel('Пароль',{exact:true}).fill(password);
+ await page.getByRole('button',{name:'Войти в пространство',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Первые шаги в Tirek',exact:true})).toBeVisible();
+});
+
+test('registration checks availability, handles a failed status read and never shows a disabled form',async({page})=>{
+ await page.route('**/api/onboarding/status',route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({message:'Не удалось связаться с сервером'})}));
+ await page.goto('/register');
+ await expect(page.getByRole('alert').filter({hasText:'Не удалось связаться с сервером'})).toBeVisible();
+ await expect(page.locator('form')).toHaveCount(0);
+ await page.unroute('**/api/onboarding/status');
+ await page.route('**/api/onboarding/status',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({registrationEnabled:false})}));
+ await page.getByRole('button',{name:'Повторить загрузку',exact:true}).click();
+ await expect(page.getByRole('status')).toHaveText('Создание компаний сейчас недоступно');
+ await expect(page.locator('form')).toHaveCount(0);
+ await page.goto('/');
+ await expect(page.getByRole('heading',{name:'С возвращением'})).toBeVisible();
+ await expect(page.getByRole('link',{name:'Создать пространство компании',exact:true})).toHaveCount(0);
+});

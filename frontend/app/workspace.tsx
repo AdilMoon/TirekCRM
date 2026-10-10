@@ -7,6 +7,7 @@ import { type SessionUser, type Client, type Order, type Dashboard } from '@tire
 import { api } from '../lib/api';
 const emptyData = { clients: [] as Client[], orders: [] as Order[], dashboard: null as Dashboard | null };
 
+import { GettingStarted } from '../features/getting-started';
 import { Brand, Stat, Empty } from '../components/ui';
 import { Team } from '../features/team';
 import { Tasks } from '../features/tasks';
@@ -85,12 +86,13 @@ const navigation = [
       <div className="sidebar-bottom"><div className="local-note"><span className="live-dot" /><div><strong>{t("Первый шаг к порядку")}</strong><p>{t("Клиенты, работа и деньги.")}<br />{t("Всё связано между собой.")}</p></div></div><button className="help-button" onClick={() => setModal({ kind: 'about' })}><CircleHelp size={18} />  {t("О проекте")} <ArrowUpRight size={15} /></button>
       <div className="profile"><span className="user-avatar">{t("В")}</span><div><strong>{user.name}</strong><span>{t("Владелец компании")}</span></div><button aria-label={t("Выйти")} className="icon-button" onClick={async () => { try { await api('/auth/logout', { method: 'POST' }); setUser(null); setData(emptyData); } catch (e) { setError((e as Error).message); } }}><LogOut size={17} /></button></div></div>
     </aside>
-    <div className="main-shell"><header className="topbar"><div className="breadcrumb"><button className="icon-button mobile-menu" aria-label={t("Меню")} onClick={() => setMobileMenu(!mobileMenu)}><Menu size={22} /></button><span>{t("Рабочее пространство")}</span><ChevronRight size={14} /><strong>{selectedNav.label}</strong></div><div className="topbar-right"><LanguageSwitcher /><span className="demo-pill">{t("Демо-пространство")}</span><span className="top-date"><CalendarDays size={16} />{formatDate(new Date(), { day: 'numeric', month: 'short', timeZone: 'Asia/Almaty' })}</span></div></header>
+    <div className="main-shell"><header className="topbar"><div className="breadcrumb"><button className="icon-button mobile-menu" aria-label={t("Меню")} onClick={() => setMobileMenu(!mobileMenu)}><Menu size={22} /></button><span>{t("Рабочее пространство")}</span><ChevronRight size={14} /><strong>{selectedNav.label}</strong></div><div className="topbar-right"><LanguageSwitcher /><span className="demo-pill">{user.organization.currency}</span><span className="top-date"><CalendarDays size={16} />{formatDate(new Date(), { day: 'numeric', month: 'short', timeZone: 'Asia/Almaty' })}</span></div></header>
     <main>
       {error && <div className="alert" role="alert">{t(error)}<button onClick={() => refresh().catch(e => setError(e.message))}>{t("Обновить")}</button></div>}
       <div className="page-heading"><div><p className="eyebrow">{section === 'overview' ? day : t("{0} / РАБОЧЕЕ ПРОСТРАНСТВО", user.organization.name)}</p><h1>{section === 'overview' ? t("Всё под контролем.") : selectedNav.label}</h1><p className="page-subtitle">{({ overview: t("Ваш бизнес в деталях. Главное — на одном экране."), clients: t("Люди и компании, с которыми вы работаете."), orders: t("От первого обращения до выполненной работы."), finances: t("Поступления и расходы без потерянных деталей."), documents: t("Документы, связанные с вашими заказами."), tasks:t('Договорённости, исполнители и сроки в одном месте.'),team:t('Люди, с которыми вы строите бизнес.'),history:t('Кто и когда изменил данные'), settings:t("Данные компании для вашего пространства и документов.") })[section]}</p></div>
       {!['settings','history','tasks','team'].includes(section) && <div className="heading-actions">{section === 'finances' && <button className="button secondary" onClick={() => setModal({ kind: 'payment' })}><Plus size={17} />{t("Оплата")}</button>}<button className="button primary" onClick={() => setModal({ kind: section === 'clients' ? 'client' : section === 'finances' ? 'expense' : section === 'documents' ? 'document' : 'order' })}><Plus size={18} />{section === 'clients' ? t("Новый клиент") : section === 'finances' ? t("Добавить расход") : section === 'documents' ? t("Создать акт") : t("Новый заказ")}</button></div>}</div>
       {section === 'overview' && dashboard && <>
+        {dashboard.clientsCount===0&&<GettingStarted onClient={()=>setModal({kind:'client'})} onSettings={()=>navigate('settings')} onTeam={()=>navigate('team')}/>}
         <div className="section-meta"><span><span className="live-dot" />{t("Сводка бизнеса")}</span><span>{t("За всё время · KZT")}</span></div>
         <div className="stats-grid">
           <Stat label={t("Получено от клиентов")} value={formatMoney(dashboard.received)} icon={<ArrowDownLeft size={19} />} detail={t("Фактически записанные оплаты")} />
@@ -111,7 +113,7 @@ const navigation = [
       {section === 'finances' && <FinanceReport revision={data} onOrder={id=>openOrder({id})}/>}
       {section === 'documents' && <DocumentDirectory revision={data}/>}
       {section === 'settings' && <div className="settings-space"><OrganizationSettings onSaved={async () => { setUser(await api<SessionUser>('/auth/me')); setToast(t("Реквизиты сохранены")); }} /><AccountSecurity onSessionEnded={expired=>{setUser(null);setData(emptyData);setError(expired?'Сессия истекла. Войдите снова':'');}}/></div>}
-<footer className="page-footer"><span>{t("Tirek · опора вашего бизнеса")}</span><span>{refreshing ? t("Обновляем данные…") : t("Демонстрационные данные вымышлены")}</span></footer>
+<footer className="page-footer"><span>{t("Tirek · опора вашего бизнеса")}</span><span>{refreshing ? t("Обновляем данные…") : t("Данные вашего рабочего пространства")}</span></footer>
     </main></div>
     {toast && <div className="toast" role="status"><CheckCircle2 size={19} />{t(toast)}</div>}
     {modal && <Editor key={`${modal.kind}-${modal.order?.id ?? modal.client?.id ?? ''}`} modal={modal} close={() => setModal(null)} saved={saved} setModal={setModal} />}

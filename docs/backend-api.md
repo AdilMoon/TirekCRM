@@ -51,3 +51,6 @@ ReportsModule — финансовые отчёты и поиск по сним�
 
 ## Безопасность аккаунта
 AuthService отвечает за атомарную смену пароля, выпуск и отзыв сеансов; AuditWriterModule разделяет запись аудита и защищённый контроллер истории. Добавлены GET /auth/sessions, POST /auth/password, DELETE /auth/sessions/:id и POST /auth/sessions/revoke-others. Обе роли управляют только собственными входами. События ACCOUNT доступны владельцу в фильтре истории. [Контракты, миграция и ограничения](account-security.md).
+
+## Создание компании
+OnboardingModule предоставляет публичные GET /onboarding/status и POST /onboarding/register. Origin, строгая схема, уникальность email, атомарная запись компании/владельца/сеанса/аудита и лимит 5 запросов/мин защищают этот сценарий. В production он закрыт по умолчанию; подтверждение email ещё отсутствует. [API и ограничения](company-onboarding.md).

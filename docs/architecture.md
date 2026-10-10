@@ -8,6 +8,7 @@
 | backend/src/app.module.ts | Подключение модулей авторизации, CRM, команды, задач и базы |
 | backend/src/modules/crm | HTTP-контроллер, SearchService и бизнес-операции CRM |
 | backend/src/auth | AuthModule/AuthService: вход/выход, смена пароля, отзыв сеансов; SessionGuard и Origin |
+| backend/src/modules/onboarding | Атомарная регистрация компании/владельца и политика доступности |
 | backend/src/modules/team | Приглашения, сотрудники и управление доступом |
 | backend/src/modules/reports | Фильтры, объединённый финансовый отчёт и поиск документов |
 | backend/src/modules/tasks | Назначения, сроки, версии и разрешённые переходы |
@@ -48,3 +49,5 @@
 По запросу пользователя после каждой итерации проводится адверсариальное ревью. Правило закреплено в AGENTS.md; результаты и воспроизводимые дефекты — в docs/reviews/.
 
 Управление собственным аккаунтом доступно обеим ролям через frontend/features/account-security.tsx. Запись аудита выделена в AuditWriterModule, чтобы AuthModule мог записывать события без циклического импорта. Контракты и ограничения описаны в [account-security.md](account-security.md).
+
+Создание компании — отдельный OnboardingModule. Он использует существующие таблицы, общий выпуск сеансов и AuditWriterModule. Интерфейс регистрации — frontend/features/register-company.tsx, маршрут /register; подсказки пустого пространства — frontend/features/getting-started.tsx. Подробности — [company-onboarding.md](company-onboarding.md).

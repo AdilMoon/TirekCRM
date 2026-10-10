@@ -4,7 +4,8 @@ import { randomBytes } from 'node:crypto';
 import { Database } from '../database/database.service';
 import { AuditService,Actor } from '../modules/audit/audit.service';
 import { serializable } from '../common/transaction';
-import { digest,hashPassword,verifyPassword } from './session.guard';
+import { createSession } from './session';
+import { hashPassword,verifyPassword } from './session.guard';
 
 const sessionSelect={id:true,tokenHash:true,createdAt:true,expiresAt:true,userAgent:true} as const;
 export const cleanUserAgent=(value:string|undefined)=>(value??'').replace(/[\u0000-\u001f\u007f]/g,'').slice(0,300);
@@ -17,10 +18,6 @@ export class AuthService {
   if(!session)throw new UnauthorizedException('Сессия истекла. Войдите снова');
   return session;
  }
- private newSession(tx:Prisma.TransactionClient,userId:string,userAgent:string){
-  const token=randomBytes(32).toString('hex'),expiresAt=new Date(Date.now()+7*86400000);
-  return tx.session.create({data:{tokenHash:digest(token),userId,expiresAt,userAgent}}).then(()=>({token,expiresAt}));
- }
  async login(email:string,password:string,userAgent:string){
   const snapshot=await this.db.client.user.findUnique({where:{email:email.toLowerCase().trim()}});
   const valid=await verifyPassword(password,snapshot?.passwordHash??await this.dummyHash);
@@ -32,7 +29,7 @@ export class AuthService {
    await tx.session.deleteMany({where:{userId:user.id,expiresAt:{lte:new Date()}}});
    const overflow=await tx.session.findMany({where:{userId:user.id},orderBy:[{createdAt:{sort:'desc',nulls:'last'}},{id:'desc'}],skip:19,select:{id:true}});
    if(overflow.length)await tx.session.deleteMany({where:{userId:user.id,id:{in:overflow.map(s=>s.id)}}});
-   return this.newSession(tx,user.id,userAgent);
+   return createSession(tx,user.id,userAgent);
   });
  }
  async sessions(actor:Actor,tokenHash:string){
@@ -50,7 +47,7 @@ export class AuthService {
    if(user.passwordHash!==previous.passwordHash)throw new UnauthorizedException('Сессия истекла. Войдите снова');
    await tx.user.update({where:{id:actor.id},data:{passwordHash}});
    await tx.session.deleteMany({where:{userId:actor.id}});
-   const session=await this.newSession(tx,actor.id,userAgent);
+   const session=await createSession(tx,actor.id,userAgent);
    await this.audit.record(tx,actor,'ACCOUNT',actor.id,'PASSWORD_CHANGED');
    return session;
   });

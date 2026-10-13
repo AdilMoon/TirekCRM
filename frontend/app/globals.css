@@ -37,3 +37,6 @@
 
 /* User-provided company and owner names must not widen the workspace. */
 .page-heading>div:first-child,.workspace-label>div,.profile>div{min-width:0}.eyebrow,.workspace-label strong,.profile strong{overflow-wrap:anywhere}.workspace-avatar,.user-avatar,.profile>.icon-button{flex-shrink:0}
+
+/* Task discussions: preserve text, wrap user content on narrow screens. */
+.task-discussion{padding:0 24px 24px;min-width:0}.task-discussion h3{margin:0 0 14px;overflow-wrap:anywhere}.task-discussion .editor-form{padding:16px 0}.task-discussion .form-note{line-height:1.6}.discussion-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}.comment-list{display:grid;gap:12px;margin-top:12px}.task-comment{border:1px solid var(--line);border-radius:12px;padding:16px;min-width:0}.task-comment header{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;font-size:12px}.task-comment strong{overflow-wrap:anywhere}.task-comment time{color:var(--muted)}.task-comment p{white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;line-height:1.6;margin:12px 0 0}.task-discussion .button{white-space:normal}.task-discussion .pagination{padding-left:0;padding-right:0}@media(max-width:760px){.task-discussion{padding:0 16px 20px}.task-comment{padding:12px}.task-discussion .form-actions .button{width:100%}}

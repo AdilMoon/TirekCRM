@@ -48,6 +48,7 @@ model User {
   isActive       Boolean @default(true)
   version        Int @default(1)
   assignedTasks  BusinessTask[]
+  taskComments   TaskComment[]
   organizationId String @db.Uuid
   organization   Organization @relation(fields: [organizationId], references: [id])
   sessions       Session[]
@@ -187,6 +188,7 @@ model Invitation {
  @@index([organizationId, email])
 }
 model BusinessTask {
+ comments       TaskComment[]
  id             String @id @default(uuid()) @db.Uuid
  organizationId String @db.Uuid
  organization   Organization @relation(fields:[organizationId],references:[id],onDelete:Cascade)
@@ -204,5 +206,21 @@ model BusinessTask {
  updatedAt      DateTime @updatedAt
  @@index([organizationId, status, createdAt, id])
  @@index([organizationId, assigneeId, status])
+ @@unique([id, organizationId])
  @@index([organizationId, orderId])
+}
+
+model TaskComment {
+ id             String @id @default(uuid()) @db.Uuid
+ organizationId String @db.Uuid
+ taskId         String @db.Uuid
+ task           BusinessTask @relation(fields:[taskId,organizationId],references:[id,organizationId],onDelete:Cascade)
+ authorId       String @db.Uuid
+ author         User @relation(fields:[authorId,organizationId],references:[id,organizationId],onDelete:Restrict)
+ authorName     String
+ body           String @db.VarChar(2000)
+ idempotencyKey String @db.Uuid
+ createdAt      DateTime @default(now())
+ @@unique([organizationId, authorId, idempotencyKey])
+ @@index([organizationId, taskId, createdAt, id])
 }

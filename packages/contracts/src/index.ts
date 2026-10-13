@@ -133,3 +133,12 @@ export const registrationSchema=z.object({
 }).strict();
 export type RegistrationInput=z.infer<typeof registrationSchema>;
 export interface RegistrationStatus {registrationEnabled:boolean}
+
+export const taskCommentSchema=z.object({
+ body:z.string().trim().min(1).max(2000).refine(value=>!/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value)),
+ idempotencyKey:z.uuid(),
+}).strict();
+export const taskCommentQuerySchema=listQuerySchema.omit({q:true}).strict();
+export type TaskCommentInput=z.infer<typeof taskCommentSchema>;
+export type TaskCommentQuery=z.infer<typeof taskCommentQuerySchema>;
+export interface TaskComment {id:string;body:string;authorId:string;authorName:string;createdAt:string}

@@ -51,3 +51,5 @@
 Управление собственным аккаунтом доступно обеим ролям через frontend/features/account-security.tsx. Запись аудита выделена в AuditWriterModule, чтобы AuthModule мог записывать события без циклического импорта. Контракты и ограничения описаны в [account-security.md](account-security.md).
 
 Создание компании — отдельный OnboardingModule. Он использует существующие таблицы, общий выпуск сеансов и AuditWriterModule. Интерфейс регистрации — frontend/features/register-company.tsx, маршрут /register; подсказки пустого пространства — frontend/features/getting-started.tsx. Подробности — [company-onboarding.md](company-onboarding.md).
+
+Обсуждения задач находятся в backend/src/modules/tasks/task-comments.service.ts и frontend/features/task-discussion.tsx. Таблица TaskComment связана с задачей и автором составными ключами организации; правила доступа и идемпотентности — в [task-discussions.md](task-discussions.md).

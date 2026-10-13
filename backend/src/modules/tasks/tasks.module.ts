@@ -4,5 +4,6 @@ import { AuthModule } from '../../auth/auth.module';
 import { AuditModule } from '../audit/audit.module';
 import { TasksController } from './tasks.controller';
 import { TasksService } from './tasks.service';
-@Module({imports:[DatabaseModule,AuthModule,AuditModule],controllers:[TasksController],providers:[TasksService]})
+import { TaskCommentsService } from './task-comments.service';
+@Module({imports:[DatabaseModule,AuthModule,AuditModule],controllers:[TasksController],providers:[TasksService,TaskCommentsService]})
 export class TasksModule {}

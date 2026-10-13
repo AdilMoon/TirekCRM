@@ -5,6 +5,7 @@ import { Database } from '../../database/database.service';
 import { AuditService } from '../audit/audit.service';
 import type { AuthRequest } from '../../auth/session.guard';
 import { serializable } from '../../common/transaction';
+import { publishTaskNotification,removeFormerAssigneeNotifications } from '../notifications/notification-writer';
 type Actor=AuthRequest['user'];
 // Deliberately select only operational fields: employees never receive financial or client data.
 const taskSelect={id:true,title:true,description:true,status:true,version:true,dueDate:true,createdAt:true,updatedAt:true,
@@ -39,6 +40,7 @@ export class TasksService {
    await this.references(tx,actor.organizationId,input);
    const task=await tx.businessTask.create({data:{...input,organizationId:actor.organizationId,createdById:actor.id,dueDate:input.dueDate?new Date(input.dueDate+'T00:00:00Z'):null},select:taskSelect});
    await this.audit.record(tx,actor,'TASK',task.id,'TASK_CREATED',{title:task.title,assignee:task.assignee.name});
+   await publishTaskNotification(tx,{organizationId:actor.organizationId,taskId:task.id,actorId:actor.id,actorName:actor.name,kind:'TASK_ASSIGNED',eventKey:'task:'+task.id+':assigned:'+task.version});
    return task;
   });
  }
@@ -50,6 +52,10 @@ export class TasksService {
    await this.references(tx,actor.organizationId,input);
    const task=await tx.businessTask.update({where:{id},data:{...input,version:{increment:1},dueDate:input.dueDate?new Date(input.dueDate+'T00:00:00Z'):null},select:taskSelect});
    await this.audit.record(tx,actor,'TASK',id,'TASK_UPDATED',{title:task.title,assignee:task.assignee.name});
+   if(previous.assigneeId!==task.assignee.id){
+    await removeFormerAssigneeNotifications(tx,actor.organizationId,id,task.assignee.id);
+    await publishTaskNotification(tx,{organizationId:actor.organizationId,taskId:id,actorId:actor.id,actorName:actor.name,kind:'TASK_ASSIGNED',eventKey:'task:'+id+':assigned:'+task.version});
+   }
    return task;
   });
  }
@@ -66,6 +72,7 @@ export class TasksService {
    if(previous.status===status)return tx.businessTask.findUniqueOrThrow({where:{id},select:taskSelect});
    const task=await tx.businessTask.update({where:{id},data:{status,version:{increment:1}},select:taskSelect});
    await this.audit.record(tx,actor,'TASK',id,'TASK_STATUS_CHANGED',{title:task.title,from:previous.status,to:status});
+   await publishTaskNotification(tx,{organizationId:actor.organizationId,taskId:id,actorId:actor.id,actorName:actor.name,kind:'TASK_STATUS_CHANGED',eventKey:'task:'+id+':status:'+task.version});
    return task;
   });
  }

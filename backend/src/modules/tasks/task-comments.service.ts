@@ -5,6 +5,7 @@ import { Database } from '../../database/database.service';
 import { AuditService } from '../audit/audit.service';
 import type { AuthRequest } from '../../auth/session.guard';
 import { serializable } from '../../common/transaction';
+import { publishTaskNotification } from '../notifications/notification-writer';
 
 type Actor = AuthRequest['user'];
 const commentSelect = { id:true, body:true, authorId:true, authorName:true, createdAt:true } as const;
@@ -47,6 +48,7 @@ export class TaskCommentsService {
    const comment = await tx.taskComment.create({data:{...input, taskId, organizationId:user.organizationId,
     authorId:user.id, authorName:user.name}, select:commentSelect});
    await this.audit.record(tx, user, 'TASK', taskId, 'TASK_COMMENT_ADDED', {commentId:comment.id});
+   await publishTaskNotification(tx,{organizationId:user.organizationId,taskId,actorId:user.id,actorName:user.name,kind:'TASK_COMMENT_ADDED',eventKey:'comment:'+comment.id});
    return comment;
   });
  }

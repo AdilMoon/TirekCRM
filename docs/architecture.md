@@ -12,6 +12,7 @@
 | backend/src/modules/team | Приглашения, сотрудники и управление доступом |
 | backend/src/modules/reports | Фильтры, объединённый финансовый отчёт и поиск документов |
 | backend/src/modules/tasks | Назначения, сроки, версии и разрешённые переходы |
+| backend/src/modules/notifications | Запись уведомлений внутри транзакции события, личный список, счётчик и прочтение |
 | backend/src/modules/audit | AuditWriterModule: запись событий без зависимости от AuthModule; AuditModule: защищённое чтение истории |
 | backend/src/database | Подключение PostgreSQL через Prisma |
 | backend/src/common | Обработка ошибок, точная денежная арифметика |
@@ -53,3 +54,5 @@
 Создание компании — отдельный OnboardingModule. Он использует существующие таблицы, общий выпуск сеансов и AuditWriterModule. Интерфейс регистрации — frontend/features/register-company.tsx, маршрут /register; подсказки пустого пространства — frontend/features/getting-started.tsx. Подробности — [company-onboarding.md](company-onboarding.md).
 
 Обсуждения задач находятся в backend/src/modules/tasks/task-comments.service.ts и frontend/features/task-discussion.tsx. Таблица TaskComment связана с задачей и автором составными ключами организации; правила доступа и идемпотентности — в [task-discussions.md](task-discussions.md).
+
+Центр уведомлений — frontend/features/notifications.tsx, подключён к обеим рабочим областям. NotificationWriter — функция с явным TransactionClient, поэтому публикация не создаёт вложенную транзакцию и не требует циклического импорта модулей. Описание — [notifications.md](notifications.md).

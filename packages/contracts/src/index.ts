@@ -142,3 +142,12 @@ export const taskCommentQuerySchema=listQuerySchema.omit({q:true}).strict();
 export type TaskCommentInput=z.infer<typeof taskCommentSchema>;
 export type TaskCommentQuery=z.infer<typeof taskCommentQuerySchema>;
 export interface TaskComment {id:string;body:string;authorId:string;authorName:string;createdAt:string}
+
+export const notificationQuerySchema=listQuerySchema.omit({q:true}).extend({unread:z.enum(['true','false']).default('false')}).strict();
+export const readNotificationsSchema=z.object({ids:z.array(z.uuid().transform(value=>value.toLowerCase())).min(1).max(100).refine(ids=>new Set(ids).size===ids.length)}).strict();
+export type NotificationQuery=z.infer<typeof notificationQuerySchema>;
+export interface AppNotification {
+ id:string;kind:'TASK_ASSIGNED'|'TASK_STATUS_CHANGED'|'TASK_COMMENT_ADDED';actorName:string;taskStatus:TaskStatus|null;
+ task:{id:string;title:string};createdAt:string;readAt:string|null;
+}
+export interface NotificationPage extends PageResult<AppNotification> {unreadCount:number}

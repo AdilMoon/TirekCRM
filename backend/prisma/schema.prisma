@@ -49,6 +49,7 @@ model User {
   version        Int @default(1)
   assignedTasks  BusinessTask[]
   taskComments   TaskComment[]
+  notifications  Notification[]
   organizationId String @db.Uuid
   organization   Organization @relation(fields: [organizationId], references: [id])
   sessions       Session[]
@@ -189,6 +190,7 @@ model Invitation {
 }
 model BusinessTask {
  comments       TaskComment[]
+ notifications  Notification[]
  id             String @id @default(uuid()) @db.Uuid
  organizationId String @db.Uuid
  organization   Organization @relation(fields:[organizationId],references:[id],onDelete:Cascade)
@@ -223,4 +225,27 @@ model TaskComment {
  createdAt      DateTime @default(now())
  @@unique([organizationId, authorId, idempotencyKey])
  @@index([organizationId, taskId, createdAt, id])
+}
+
+enum NotificationKind {
+ TASK_ASSIGNED
+ TASK_STATUS_CHANGED
+ TASK_COMMENT_ADDED
+}
+model Notification {
+ id             String @id @default(uuid()) @db.Uuid
+ organizationId String @db.Uuid
+ recipientId    String @db.Uuid
+ recipient      User @relation(fields:[recipientId,organizationId],references:[id,organizationId],onDelete:Cascade)
+ taskId         String @db.Uuid
+ task           BusinessTask @relation(fields:[taskId,organizationId],references:[id,organizationId],onDelete:Cascade)
+ kind           NotificationKind
+ eventKey       String @db.VarChar(160)
+ actorName      String
+ taskStatus     TaskStatus?
+ createdAt      DateTime @default(now())
+ readAt         DateTime?
+ @@unique([organizationId,recipientId,eventKey])
+ @@index([organizationId,recipientId,createdAt,id])
+ @@index([organizationId,recipientId,readAt])
 }

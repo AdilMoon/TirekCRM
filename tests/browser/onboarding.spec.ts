@@ -1,4 +1,4 @@
-import { test,expect } from '@playwright/test';
+import { test,expect } from './fixtures';
 import 'dotenv/config';
 import { randomUUID } from 'node:crypto';
 import { PrismaClient } from '@prisma/client';

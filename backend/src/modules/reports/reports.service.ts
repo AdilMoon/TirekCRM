@@ -48,8 +48,9 @@ export class ReportsService {
   // Search immutable snapshot data, not the current client/order name.
   const source=Prisma.sql`WITH filtered AS (
    SELECT id,number,kind,"orderId",(snapshot->>'orderNumber')::integer AS "orderNumber",
-    snapshot->'client'->>'name' AS "clientName",snapshot->>'total' AS total,"createdAt"
+    snapshot->'client'->>'name' AS "clientName",COALESCE(snapshot->'invoice'->>'amountDue',snapshot->>'total') AS total,"createdAt"
    FROM "Document" WHERE "organizationId"=${org}::uuid ${dates(query)}
+   ${query.kind?Prisma.sql`AND kind=${query.kind}`:Prisma.empty}
    ${query.orderId?Prisma.sql`AND "orderId"=${query.orderId}::uuid`:Prisma.empty}
    ${query.q?Prisma.sql`AND (strpos(lower(snapshot->'client'->>'name'),lower(${query.q}))>0 OR strpos(lower(snapshot->'client'->>'company'),lower(${query.q}))>0 OR strpos(lower(snapshot->>'title'),lower(${query.q}))>0 ${number===null?Prisma.empty:Prisma.sql`OR number=${number} OR (snapshot->>'orderNumber')::integer=${number}`})`:Prisma.empty}
   )`;

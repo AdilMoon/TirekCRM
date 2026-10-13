@@ -296,7 +296,7 @@ test('financial filters, historical records and complete order pickers work on m
  await page.getByRole('button',{name:'Сохранить',exact:true}).click();await expect(page.getByRole('dialog')).toHaveCount(0);
  expect(await db.payment.count({where:{orderId:target.id}})).toBe(1);
  await navigate('Документы');
- await page.getByPlaceholder('Номер акта, заказ или клиент').fill('Archive browser client');
+ await page.getByPlaceholder('Номер документа, заказ или клиент').fill('Archive browser client');
  await expect(page.locator('.pagination')).toContainText('Всего: 205');
  await page.getByRole('button',{name:'Далее',exact:true}).click();await expect(page.locator('.pagination')).toContainText('Страница 2 из 11');
  await page.getByRole('button',{name:'Создать акт',exact:true}).click();
@@ -304,7 +304,7 @@ test('financial filters, historical records and complete order pickers work on m
  await page.getByRole('combobox',{name:'Выполненный заказ *',exact:true}).selectOption(target.id);
  await page.getByRole('button',{name:'Создать черновик',exact:true}).click();await expect(page.getByRole('dialog')).toHaveCount(0);
  await page.getByRole('button',{name:'Сбросить фильтры'}).click();
- await page.getByPlaceholder('Номер акта, заказ или клиент').fill('30206');
+ await page.getByPlaceholder('Номер документа, заказ или клиент').fill('30206');
  await expect(page.locator('.pagination')).toContainText('Всего: 1');
  const [docPage]=await Promise.all([page.waitForEvent('popup'),page.getByRole('link',{name:'Открыть',exact:true}).click()]);
  await expect(docPage.getByRole('heading',{name:'Archive browser client',exact:true})).toBeVisible();await docPage.close();

@@ -54,3 +54,6 @@ AuthService отвечает за атомарную смену пароля, в
 
 ## Создание компании
 OnboardingModule предоставляет публичные GET /onboarding/status и POST /onboarding/register. Origin, строгая схема, уникальность email, атомарная запись компании/владельца/сеанса/аудита и лимит 5 запросов/мин защищают этот сценарий. В production он закрыт по умолчанию; подтверждение email ещё отсутствует. [API и ограничения](company-onboarding.md).
+
+## Реквизиты и счета (14.10.2026)
+PATCH /clients/:id и PATCH /organization требуют version; GET /organization и списки клиентов возвращают её. Добавлены businessId, bankName, iban, bic. POST /orders/:id/invoices создаёт INVOICE_DRAFT со снимком и идемпотентным ключом. GET /documents/search принимает kind=ACT_DRAFT|INVOICE_DRAFT. Полный контракт и ограничения: [document-workflow.md](document-workflow.md).

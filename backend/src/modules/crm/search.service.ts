@@ -7,9 +7,9 @@ import { orderInclude, serializeOrder } from './crm.service';
 export class SearchService {
  constructor(private readonly db:Database) {}
  async clients(org:string,query:ListQuery) {
-  const where:Prisma.ClientWhereInput={organizationId:org,...(query.q?{OR:['name','phone','company','email'].map(field=>({[field]:{contains:query.q,mode:'insensitive'}}))}:{})};
+  const where:Prisma.ClientWhereInput={organizationId:org,...(query.q?{OR:['name','phone','company','email','businessId'].map(field=>({[field]:{contains:query.q,mode:'insensitive'}}))}:{})};
   const [rows,total]=await this.db.client.$transaction([
-   this.db.client.client.findMany({where,select:{id:true,name:true,phone:true,email:true,company:true,address:true,createdAt:true,_count:{select:{orders:true}}},orderBy:[{createdAt:'desc'},{id:'desc'}],skip:(query.page-1)*query.pageSize,take:query.pageSize}),
+   this.db.client.client.findMany({where,select:{id:true,name:true,phone:true,email:true,company:true,address:true,businessId:true,bankName:true,iban:true,bic:true,version:true,createdAt:true,_count:{select:{orders:true}}},orderBy:[{createdAt:'desc'},{id:'desc'}],skip:(query.page-1)*query.pageSize,take:query.pageSize}),
    this.db.client.client.count({where}),
   ],{isolationLevel:Prisma.TransactionIsolationLevel.RepeatableRead});
   return {items:rows.map(({_count,...row})=>({...row,ordersCount:_count.orders})),total,page:query.page,pageSize:query.pageSize,pages:Math.ceil(total/query.pageSize)};

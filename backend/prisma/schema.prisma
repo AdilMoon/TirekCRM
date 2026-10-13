@@ -32,6 +32,10 @@ model Organization {
   tasks        BusinessTask[]
   orderSeq     Int @default(0)
   documentSeq  Int @default(0)
+  bankName String @default("")
+  iban String @default("")
+  bic String @default("")
+  version Int @default(1)
   users        User[]
   clients      Client[]
   orders       Order[]
@@ -76,6 +80,11 @@ model Client {
   company        String @default("")
   address        String @default("")
   createdAt      DateTime @default(now())
+  businessId String @default("")
+  bankName String @default("")
+  iban String @default("")
+  bic String @default("")
+  version Int @default(1)
   orders         Order[]
   @@unique([id, organizationId])
   @@index([organizationId, createdAt])
@@ -151,9 +160,11 @@ model Document {
   order          Order @relation(fields: [orderId, organizationId], references: [id, organizationId])
   number         Int
   kind           String @default("ACT_DRAFT")
+  idempotencyKey String? @db.Uuid
   snapshot       Json
   createdAt      DateTime @default(now())
   @@unique([organizationId, number])
+  @@unique([organizationId, idempotencyKey])
   @@index([organizationId, createdAt])
   @@index([organizationId, createdAt, id])
 }

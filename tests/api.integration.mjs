@@ -66,11 +66,11 @@ test('CRM vertical slice: isolation, exact money, concurrent payments, document 
     await t.test('keeps document snapshot and tenant access immutable', async () => {
       const created = await request(`/orders/${order.id}/documents`, { ...a, method:'POST', body:{} });
       assert.equal(created.status, 201);
-      assert.equal((await request('/clients/'+client.body.id, { ...a, method:'PATCH', body:{ name:'Changed name' } })).status,200);
-      assert.equal((await request('/clients/'+client.body.id, { ...b, method:'PATCH', body:{ name:'Stolen client' } })).status,404);
-      assert.equal((await request('/organization', { ...a, method:'PATCH', body:{ name:'Updated company', address:'Almaty', businessId:'123456789012' } })).status,200);
+      assert.equal((await request('/clients/'+client.body.id, { ...a, method:'PATCH', body:{ name:'Changed name',version:client.body.version } })).status,200);
+      assert.equal((await request('/clients/'+client.body.id, { ...b, method:'PATCH', body:{ name:'Stolen client',version:1 } })).status,404);
+      assert.equal((await request('/organization', { ...a, method:'PATCH', body:{ name:'Updated company', address:'Almaty', businessId:'123456789012',version:1 } })).status,200);
       assert.equal((await request('/organization', b)).body.name,'Integration test');
-      assert.equal((await request('/organization', { ...a, method:'PATCH', body:{ name:'Broken', address:'', businessId:'123' } })).status,400);
+      assert.equal((await request('/organization', { ...a, method:'PATCH', body:{ name:'Broken', address:'', businessId:'123',version:2 } })).status,400);
       assert.equal((await request('/organization')).status,401);
       const doc = await request(`/documents/${created.body.id}`, a);
       assert.equal(doc.body.snapshot.client.name, 'Test client A');

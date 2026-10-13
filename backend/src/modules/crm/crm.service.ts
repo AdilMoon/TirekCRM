@@ -1,8 +1,9 @@
 import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { ClientInput, OrderInput, PaymentInput, ExpenseInput, Stage, stages, DocumentSnapshot, UpdateOrderInput, OrganizationInput } from '@tirek/contracts';
+import { ClientInput, UpdateClientInput, OrganizationRecord, OrderInput, PaymentInput, ExpenseInput, Stage, stages, DocumentSnapshot, UpdateOrderInput } from '@tirek/contracts';
 import { Database } from '../../database/database.service';
 import { AuditService, Actor } from '../audit/audit.service';
+import { clientRequisites,organizationRequisites } from '../documents/snapshot';
 import { serializable } from '../../common/transaction';
 import { cents, money, totalForItems } from '../../common/money';
 
@@ -13,7 +14,7 @@ export function serializeOrder(order: FullOrder) {
   const paid = order.payments.reduce((sum, p) => sum + cents(p.amount.toFixed(2)), 0n);
   return { id:order.id,number:order.number,title:order.title,status:order.status,version:order.version,
     dueDate:order.dueDate,notes:order.notes,createdAt:order.createdAt,
-    client:{id:order.client.id,name:order.client.name,phone:order.client.phone,email:order.client.email,company:order.client.company,address:order.client.address},
+    client:{id:order.client.id,...clientRequisites(order.client)},
     total:amount(order.total),paid:money(paid),debt:money(cents(amount(order.total))-paid),
     items:order.items.map(item=>({description:item.description,quantity:item.quantity,unitPrice:amount(item.unitPrice),total:amount(item.total)})),
   };
@@ -39,20 +40,25 @@ export class CrmService {
       return client;
     });
   }
-  async updateClient(org:string,id:string,input:ClientInput,actor:Actor) {
+  async updateClient(org:string,id:string,input:UpdateClientInput,actor:Actor) {
     return this.transaction(async tx=>{
       const previous=await tx.client.findFirst({where:{id,organizationId:org}});
       if(!previous)throw new NotFoundException('Клиент не найден');
-      await tx.client.update({where:{id},data:input});
+      if(previous.version!==input.version)throw new ConflictException('Реквизиты клиента уже изменены. Обновите страницу');
+      const {version,...data}=input;
+      await tx.client.update({where:{id},data:{...data,version:{increment:1}}});
       await this.audit.record(tx,actor,'CLIENT',id,'CLIENT_UPDATED',{name:input.name});
       return {ok:true};
     });
   }
-  async updateOrganization(org:string,input:OrganizationInput,actor:Actor) {
+  async updateOrganization(org:string,input:OrganizationRecord,actor:Actor) {
     return this.transaction(async tx=>{
-      const organization=await tx.organization.update({where:{id:org},data:input,select:{name:true,address:true,businessId:true}});
+      const previous=await tx.organization.findUniqueOrThrow({where:{id:org}});
+      if(previous.version!==input.version)throw new ConflictException('Реквизиты предприятия уже изменены. Обновите страницу');
+      const {version,...data}=input;
+      const organization=await tx.organization.update({where:{id:org},data:{...data,version:{increment:1}}});
       await this.audit.record(tx,actor,'ORGANIZATION',org,'ORGANIZATION_UPDATED',{name:input.name});
-      return organization;
+      return {...organizationRequisites(organization),version:organization.version};
     });
   }
   async order(org:string,id:string) {
@@ -162,7 +168,7 @@ export class CrmService {
     const docs = await this.db.client.document.findMany({ where: { organizationId: org }, include: { order: true }, orderBy: { createdAt: 'desc' }, take: 200 });
     return docs.map(doc => { const snapshot = doc.snapshot as unknown as DocumentSnapshot; return {
       id: doc.id, number: doc.number, kind: doc.kind, orderId: doc.orderId, orderNumber: doc.order.number,
-      clientName: snapshot.client.name, total: snapshot.total, createdAt: doc.createdAt,
+      clientName: snapshot.client.name, total: snapshot.invoice?.amountDue ?? snapshot.total, createdAt: doc.createdAt,
     }; });
   }
   async document(org: string, id: string) {
@@ -177,8 +183,8 @@ export class CrmService {
       if (order.status !== 'COMPLETED') throw new ConflictException('Акт доступен после выполнения заказа');
       const organization = await tx.organization.update({ where: { id: org }, data: { documentSeq: { increment: 1 } } });
       const snapshot: DocumentSnapshot = {
-        organization: { name: organization.name, address: organization.address, businessId: organization.businessId },
-        client: { name: order.client.name, company: order.client.company, phone: order.client.phone, email: order.client.email, address: order.client.address },
+        organization: organizationRequisites(organization),
+        client: clientRequisites(order.client),
         orderNumber: order.number, title: order.title, total: amount(order.total),
         items: order.items.map(item => ({ description: item.description, quantity: item.quantity, unitPrice: amount(item.unitPrice), total: amount(item.total) })),
       };

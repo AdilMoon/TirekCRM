@@ -10,6 +10,7 @@
 | backend/src/auth | AuthModule/AuthService: вход/выход, смена пароля, отзыв сеансов; SessionGuard и Origin |
 | backend/src/modules/onboarding | Атомарная регистрация компании/владельца и политика доступности |
 | backend/src/modules/team | Приглашения, сотрудники и управление доступом |
+| backend/src/modules/documents | Счета, идемпотентность и снимки реквизитов; акты используют общий сборщик реквизитов |
 | backend/src/modules/reports | Фильтры, объединённый финансовый отчёт и поиск документов |
 | backend/src/modules/tasks | Назначения, сроки, версии и разрешённые переходы |
 | backend/src/modules/notifications | Запись уведомлений внутри транзакции события, личный список, счётчик и прочтение |

@@ -9,7 +9,20 @@ export const stageLabels: Record<Stage, string> = {
 export const moneySchema = z.string().regex(/^(0|[1-9]\d{0,11})(\.\d{1,2})?$/, 'Введите сумму с точностью до тиына')
   .refine(value => /[1-9]/.test(value), 'Сумма должна быть больше нуля');
 const text = (max: number) => z.string().trim().min(1, 'Обязательное поле').max(max);
+const optionalText = (max:number) => z.string().trim().max(max).refine(value=>!(/[\u0000-\u001f\u007f]/.test(value)), 'Недопустимые символы в реквизитах').default('');
+export const businessIdSchema = z.string().trim().regex(/^(\d{12})?$/, 'ИИН/БИН должен содержать 12 цифр').default('');
+export const ibanSchema = z.string().trim().max(40).transform(value=>value.replace(/ /g,'').toUpperCase()).refine(value=>{
+  if(!value)return true;
+  if(!/^KZ\d{5}[A-Z0-9]{13}$/.test(value))return false;
+  const digits=(value.slice(4)+value.slice(0,4)).replace(/[A-Z]/g,c=>String(c.charCodeAt(0)-55));
+  return BigInt(digits)%97n===1n;
+}, 'Укажите корректный IBAN Казахстана').default('');
+export const bankFields = {
+  bankName:optionalText(160), iban:ibanSchema,
+  bic:z.string().trim().toUpperCase().regex(/^([A-Z]{4}KZ[A-Z0-9]{2})?$/, 'БИК должен содержать 8 символов банка Казахстана').default(''),
+};
 export const clientSchema = z.object({
+  businessId:businessIdSchema, ...bankFields,
   name: text(160), phone: z.string().trim().max(32).default(''),
   email: z.union([z.literal(''), z.email()]).default(''),
   company: z.string().trim().max(160).default(''),
@@ -28,27 +41,33 @@ export const expenseSchema = z.object({
 });
 export const loginSchema = z.object({ email: z.email().max(254), password: z.string().min(1).max(128) });
 export type ClientInput = z.infer<typeof clientSchema>;
+export const updateClientSchema=clientSchema.extend({version:z.number().int().min(1)}).strict();
+export type UpdateClientInput=z.infer<typeof updateClientSchema>;
 export const organizationSchema = z.object({
   name: text(160), address: z.string().trim().max(300),
-  businessId: z.string().trim().regex(/^(\d{12})?$/, 'ИИН/БИН должен содержать 12 цифр'),
+  businessId:businessIdSchema, ...bankFields,
 });
 export type OrganizationInput = z.infer<typeof organizationSchema>;
+export interface OrganizationRecord extends OrganizationInput {version:number}
+export const updateOrganizationSchema=organizationSchema.extend({version:z.number().int().min(1)}).strict();
 export type OrderInput = z.infer<typeof orderSchema>;
 export type PaymentInput = z.infer<typeof paymentSchema>;
 export type ExpenseInput = z.infer<typeof expenseSchema>;
 export const expenseLabels: Record<string, string> = { MATERIALS: 'Материалы', LABOR: 'Исполнители', TRANSPORT: 'Транспорт', RENT: 'Аренда', OTHER: 'Прочее' };
 
-export interface Client extends ClientInput { id: string; createdAt: string; ordersCount: number }
+export interface Client extends ClientInput { version:number; id: string; createdAt: string; ordersCount: number }
 export interface Order {
   id: string; number: number; title: string; status: Stage; version: number; total: string; paid: string; debt: string;
   dueDate: string | null; notes: string; client: ClientInput & { id: string };
   createdAt: string; items: { description: string; quantity: number; unitPrice: string; total: string }[];
 }
 export interface Movement { id: string; kind: 'INCOME' | 'EXPENSE'; amount: string; description: string; category: string; orderId?:string|null; orderNumber: number | null; createdAt: string }
-export interface DocumentRecord { id: string; number: number; kind: 'ACT_DRAFT'; orderId: string; orderNumber: number; clientName: string; total: string; createdAt: string }
+export interface DocumentRecord { id: string; number: number; kind: 'ACT_DRAFT' | 'INVOICE_DRAFT'; orderId: string; orderNumber: number; clientName: string; total: string; createdAt: string }
 export interface DocumentSnapshot {
-  organization: { name: string; address: string; businessId: string };
-  client: ClientInput; orderNumber: number; title: string; total: string;
+  organization: { name: string; address: string; businessId: string; bankName?:string; iban?:string; bic?:string };
+  client: Omit<ClientInput,'businessId'|'bankName'|'iban'|'bic'> & Partial<Pick<ClientInput,'businessId'|'bankName'|'iban'|'bic'>>;
+  invoice?:{orderVersion:number;dueDate:string|null;note:string;paid:string;amountDue:string;currency:'KZT'};
+  orderNumber: number; title: string; total: string;
   items: { description: string; quantity: number; unitPrice: string; total: string }[];
 }
 export interface Dashboard {
@@ -114,7 +133,7 @@ export const movementQuerySchema=listQuerySchema.extend({
  ...periodFields,kind:z.enum(['INCOME','EXPENSE']).optional(),
  category:z.enum(['ORDER_PAYMENT','MATERIALS','LABOR','TRANSPORT','RENT','OTHER']).optional(),
 }).strict().refine(value=>!value.from||!value.to||value.from<=value.to,{message:'Начало периода позже окончания'});
-export const documentQuerySchema=listQuerySchema.extend(periodFields).strict()
+export const documentQuerySchema=listQuerySchema.extend({...periodFields,kind:z.enum(['ACT_DRAFT','INVOICE_DRAFT']).optional()}).strict()
  .refine(value=>!value.from||!value.to||value.from<=value.to,{message:'Начало периода позже окончания'});
 export type MovementQuery=z.infer<typeof movementQuerySchema>;
 export type DocumentQuery=z.infer<typeof documentQuerySchema>;
@@ -151,3 +170,10 @@ export interface AppNotification {
  task:{id:string;title:string};createdAt:string;readAt:string|null;
 }
 export interface NotificationPage extends PageResult<AppNotification> {unreadCount:number}
+
+export const invoiceSchema=z.object({
+ orderVersion:z.number().int().min(1),idempotencyKey:z.uuid().transform(value=>value.toLowerCase()),
+ dueDate:z.iso.date().refine(value=>value>='0001-01-01').nullable().default(null),
+ note:z.string().trim().max(500).refine(value=>!(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value)), 'Недопустимые символы в реквизитах').default(''),
+}).strict();
+export type InvoiceInput=z.infer<typeof invoiceSchema>;

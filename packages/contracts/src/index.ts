@@ -61,7 +61,7 @@ export interface Order {
   dueDate: string | null; notes: string; client: ClientInput & { id: string };
   createdAt: string; items: { description: string; quantity: number; unitPrice: string; total: string }[];
 }
-export interface Movement { id: string; kind: 'INCOME' | 'EXPENSE'; amount: string; description: string; category: string; orderId?:string|null; orderNumber: number | null; createdAt: string }
+export interface Movement { id: string; kind: 'INCOME' | 'EXPENSE' | 'REFUND' | 'EXPENSE_REVERSAL'; sourceId?:string|null; amount: string; description: string; category: string; orderId?:string|null; orderNumber: number | null; createdAt: string }
 export type DocumentStatus='DRAFT'|'ANNULLED';
 export interface DocumentRecord { status:DocumentStatus; version:number; id: string; number: number; kind: 'ACT_DRAFT' | 'INVOICE_DRAFT'; orderId: string; orderNumber: number; clientName: string; total: string; createdAt: string }
 export interface DocumentSnapshot {
@@ -131,8 +131,8 @@ export interface BusinessTask {
 const reportDate=z.iso.date().refine(value=>value>='0001-01-01');
 const periodFields={from:reportDate.optional(),to:reportDate.optional(),orderId:z.uuid().optional()};
 export const movementQuerySchema=listQuerySchema.extend({
- ...periodFields,kind:z.enum(['INCOME','EXPENSE']).optional(),
- category:z.enum(['ORDER_PAYMENT','MATERIALS','LABOR','TRANSPORT','RENT','OTHER']).optional(),
+ ...periodFields,kind:z.enum(['INCOME','EXPENSE','REFUND','EXPENSE_REVERSAL']).optional(),
+ category:z.enum(['ORDER_PAYMENT','ORDER_REFUND','MATERIALS','LABOR','TRANSPORT','RENT','OTHER']).optional(),
 }).strict().refine(value=>!value.from||!value.to||value.from<=value.to,{message:'Начало периода позже окончания'});
 export const documentQuerySchema=listQuerySchema.extend({...periodFields,status:z.enum(['DRAFT','ANNULLED']).optional(),kind:z.enum(['ACT_DRAFT','INVOICE_DRAFT']).optional()}).strict()
  .refine(value=>!value.from||!value.to||value.from<=value.to,{message:'Начало периода позже окончания'});
@@ -213,3 +213,13 @@ export interface PrivacyRequestSummary {
  id:string;kind:PrivacyRequestKind;status:PrivacyRequestStatus;subjectName:string;receivedOn:string;dueOn:string|null;version:number;createdAt:string;overdue:boolean;
 }
 export interface PrivacyRequestDetail extends PrivacyRequestSummary {contact:string;description:string;resolution:string;createdByName:string;closedAt:string|null;updatedAt:string}
+
+const adjustmentReason=z.string().trim().min(3).max(500).refine(value=>!/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f\ud800-\udfff]/u.test(value));
+export const expenseReversalSchema=z.object({reason:adjustmentReason,idempotencyKey:z.uuid().transform(v=>v.toLowerCase())}).strict();
+export const refundSchema=expenseReversalSchema.extend({amount:moneySchema}).strict();
+export type RefundInput=z.infer<typeof refundSchema>;
+export type ExpenseReversalInput=z.infer<typeof expenseReversalSchema>;
+export interface FinancialOperation {
+ id:string;kind:'INCOME'|'EXPENSE';amount:string;remaining:string;description:string;createdAt:string;
+ corrections:{id:string;amount:string;reason:string;actorName:string;createdAt:string}[];
+}

@@ -12,6 +12,7 @@
 | backend/src/modules/team | Приглашения, сотрудники и управление доступом |
 | backend/src/modules/documents | Счета, аннулирование черновиков, идемпотентность и снимки реквизитов; акты используют общий сборщик реквизитов |
 | backend/src/modules/privacy-requests | Реестр обращений, версии, подтверждения повторов и минимальный аудит |
+| backend/src/modules/finance | Возвраты, сторнирования и общий SQL-источник финансовых движений |
 | backend/src/modules/reports | Фильтры, объединённый финансовый отчёт и поиск документов |
 | backend/src/modules/tasks | Назначения, сроки, версии и разрешённые переходы |
 | backend/src/modules/notifications | Запись уведомлений внутри транзакции события, личный список, счётчик и прочтение |
@@ -62,3 +63,5 @@
 Адаптивная навигация владельца выделена в frontend/components/workspace-navigation.tsx; мобильные переопределения стилей — frontend/app/mobile.css. Подробности — [мобильное рабочее пространство](mobile-workspace.md).
 
 Реестр обращений — отдельный PrivacyRequestsModule и компоненты frontend/features/privacy-requests.tsx / privacy-request-forms.tsx. Правила доступа, повторов и ограничения — в [privacy-requests.md](privacy-requests.md).
+
+Чистая оплаченная сумма вычисляется в backend/src/common/paid.ts. Отчёты, обзор и совместимый /movements используют modules/finance/ledger.ts; форма операций — frontend/features/financial-operation.tsx. [Правила финансовых корректировок](finance-adjustments.md).

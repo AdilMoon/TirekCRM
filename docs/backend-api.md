@@ -21,7 +21,7 @@ GET /api/orders/:id возвращает свежую карточку и versio
 PATCH /api/orders/:id принимает поля создания заказа и обязательный version.
 - Разрешены NEW, CONFIRMED и IN_PROGRESS.
 - COMPLETED и CANCELLED закрыты для правок.
-- Сумма не может стать меньше полученных оплат.
+- Сумма не может стать меньше полученных оплат за вычетом возвратов.
 - После первой оплаты нельзя сменить клиента.
 - Несовпадение version возвращает 409: UI сохраняет введённую форму и показывает предложение открыть заказ заново.
 - Отсутствующий/чужой заказ возвращает 404.
@@ -65,3 +65,7 @@ PATCH /clients/:id и PATCH /organization требуют version; GET /organizat
 ## Обращения по персональным данным
 
 OWNER: GET/POST `/api/privacy-requests`, GET/PATCH `/api/privacy-requests/:id`. Запись проверяет Origin, организацию, активного владельца и строгий контракт. Версии и ключи повторов защищают переходы; закрытие требует результата. Фильтры и подробный контракт — [privacy-requests.md](privacy-requests.md).
+
+## Возвраты и исправления
+
+FinanceModule: GET `/api/finance/payments/:id`, POST `/api/finance/payments/:id/refunds`, GET `/api/finance/expenses/:id`, POST `/api/finance/expenses/:id/reversal`. OWNER, Origin, атомарность, повторы и проверки остатка описаны в [finance-adjustments.md](finance-adjustments.md).

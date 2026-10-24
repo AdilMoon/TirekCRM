@@ -114,7 +114,7 @@ const navigation = [
       {section === 'tasks' && <Tasks user={user}/>}
       {section === 'team' && <Team/>}
       {section === 'history' && <AuditTrail revision={data}/>}
-      {section === 'finances' && <FinanceReport revision={data} onOrder={id=>openOrder({id})}/>}
+      {section === 'finances' && <FinanceReport revision={data} onChanged={()=>{refresh().catch(e=>setError(e.message));}} onOrder={id=>openOrder({id})}/>}
       {section === 'documents' && <DocumentDirectory revision={data}/>}
       {section === 'settings' && <div className="settings-space"><PrivacyRequests/><OrganizationSettings onSaved={async () => { setUser(await api<SessionUser>('/auth/me')); setToast(t("Реквизиты сохранены")); }} /><AccountSecurity onSessionEnded={expired=>{setUser(null);setData(emptyData);setError(expired?'Сессия истекла. Войдите снова':'');}}/></div>}
 <footer className="page-footer"><span>{t("Tirek · опора вашего бизнеса")}</span><span>{refreshing ? t("Обновляем данные…") : t("Данные вашего рабочего пространства")}</span></footer>

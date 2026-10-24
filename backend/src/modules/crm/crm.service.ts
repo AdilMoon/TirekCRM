@@ -1,3 +1,5 @@
+import {movementSource,receivedSql,expensesSql,cashFlowSql} from '../finance/ledger';
+import {paidCents,paymentsWithRefunds} from '../../common/paid';
 import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { ClientInput, UpdateClientInput, OrganizationRecord, OrderInput, PaymentInput, ExpenseInput, Stage, stages, DocumentSnapshot, UpdateOrderInput } from '@tirek/contracts';
@@ -7,15 +9,15 @@ import { clientRequisites,organizationRequisites } from '../documents/snapshot';
 import { serializable } from '../../common/transaction';
 import { cents, money, totalForItems } from '../../common/money';
 
-export const orderInclude = { client: true, items: true, payments: true } satisfies Prisma.OrderInclude;
+export const orderInclude = { client: true, items: true, ...paymentsWithRefunds } satisfies Prisma.OrderInclude;
 type FullOrder = Prisma.OrderGetPayload<{ include: typeof orderInclude }>;
 const amount = (value: Prisma.Decimal | null | undefined) => value?.toFixed(2) ?? '0.00';
 export function serializeOrder(order: FullOrder) {
-  const paid = order.payments.reduce((sum, p) => sum + cents(p.amount.toFixed(2)), 0n);
+  const paid = paidCents(order.payments);
   return { id:order.id,number:order.number,title:order.title,status:order.status,version:order.version,
     dueDate:order.dueDate,notes:order.notes,createdAt:order.createdAt,
     client:{id:order.client.id,...clientRequisites(order.client)},
-    total:amount(order.total),paid:money(paid),debt:money(cents(amount(order.total))-paid),
+    total:amount(order.total),paid:money(paid),debt:order.status==='CANCELLED'?'0.00':money(cents(amount(order.total))-paid),
     items:order.items.map(item=>({description:item.description,quantity:item.quantity,unitPrice:amount(item.unitPrice),total:amount(item.total)})),
   };
 }
@@ -76,7 +78,7 @@ export class CrmService {
       if(!await tx.client.findFirst({where:{id:input.clientId,organizationId:org}}))throw new NotFoundException('Клиент не найден');
       const total=totalForItems(input.items);
       if(cents(total)>999999999999999999n)throw new ConflictException('Сумма заказа слишком велика');
-      const paid=previous.payments.reduce((sum,p)=>sum+cents(amount(p.amount)),0n);
+      const paid=paidCents(previous.payments);
       if(cents(total)<paid)throw new ConflictException('Сумма заказа не может быть меньше полученной оплаты');
       const order=await tx.order.update({where:{id},data:{
         title:input.title,clientId:input.clientId,notes:input.notes,total,
@@ -117,7 +119,7 @@ export class CrmService {
       if (!order) throw new NotFoundException('Заказ не найден');
       if (order.status === status) return serializeOrder(order);
       if (!transitions[order.status].includes(status)) throw new ConflictException('Этот переход статуса недоступен');
-      if (status === 'CANCELLED' && order.payments.length) throw new ConflictException('У заказа есть оплаты. Сначала требуется оформить возврат; возвраты появятся в следующей версии');
+      if (status === 'CANCELLED' && paidCents(order.payments)>0n) throw new ConflictException('Для отмены заказа сначала верните оставшуюся оплату');
       const updated=await tx.order.update({where:{id},data:{status,version:{increment:1}},include:orderInclude});
       await this.audit.record(tx,actor,'ORDER',id,'ORDER_STATUS_CHANGED',{number:order.number,from:order.status,to:status});
       return serializeOrder(updated);
@@ -130,10 +132,10 @@ export class CrmService {
         if (existing.orderId !== orderId || amount(existing.amount) !== money(cents(input.amount)) || existing.note !== input.note) throw new ConflictException('Ключ операции уже использован для другого платежа');
         return { ...existing, amount: amount(existing.amount) };
       }
-      const order = await tx.order.findFirst({ where: { id: orderId, organizationId: org }, include: { payments: true } });
+      const order = await tx.order.findFirst({ where: { id: orderId, organizationId: org }, include: paymentsWithRefunds });
       if (!order) throw new NotFoundException('Заказ не найден');
       if (order.status === 'CANCELLED') throw new ConflictException('Отменённый заказ нельзя оплатить');
-      const paid = order.payments.reduce((sum, p) => sum + cents(amount(p.amount)), 0n);
+      const paid = paidCents(order.payments);
       if (paid + cents(input.amount) > cents(amount(order.total))) throw new ConflictException('Оплата превышает остаток по заказу');
       const payment = await tx.payment.create({ data: { organizationId: org, orderId, ...input } });
       await tx.order.update({where:{id:orderId},data:{version:{increment:1}}});
@@ -155,15 +157,10 @@ export class CrmService {
     });
   }
   async movements(org: string) {
-    const [payments, expenses] = await Promise.all([
-      this.db.client.payment.findMany({ where: { organizationId: org }, include: { order: true }, orderBy: { createdAt: 'desc' }, take: 200 }),
-      this.db.client.expense.findMany({ where: { organizationId: org }, include: { order: true }, orderBy: { createdAt: 'desc' }, take: 200 }),
-    ]);
-    return [
-      ...payments.map(p => ({ id: p.id, kind: 'INCOME', amount: amount(p.amount), description: p.note || p.order.title, category: 'Оплата заказа', orderNumber: p.order.number, createdAt: p.createdAt })),
-      ...expenses.map(e => ({ id: e.id, kind: 'EXPENSE', amount: amount(e.amount), description: e.description, category: e.category, orderNumber: e.order?.number ?? null, createdAt: e.createdAt })),
-    ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(0, 200);
+    const rows=await this.db.client.$queryRaw<{id:string;kind:string;amount:Prisma.Decimal;description:string;category:string;sourceId:string|null;orderId:string|null;orderNumber:number|null;createdAt:Date}[]>(Prisma.sql`SELECT id,kind,amount,description,category,"sourceId","orderId","orderNumber","createdAt" FROM (${movementSource(org)}) m ORDER BY "createdAt" DESC,id DESC,kind DESC LIMIT 200`);
+    return rows.map(r=>({...r,category:r.category==='ORDER_PAYMENT'?'Оплата заказа':r.category,amount:r.amount.toFixed(2)}));
   }
+
   async documents(org: string) {
     const docs = await this.db.client.document.findMany({ where: { organizationId: org }, include: { order: true }, orderBy: { createdAt: 'desc' }, take: 200 });
     return docs.map(doc => { const snapshot = doc.snapshot as unknown as DocumentSnapshot; return {
@@ -195,22 +192,22 @@ export class CrmService {
   }
   async dashboard(org: string) {
     const db = this.db.client;
-    const [documentsCount, clientsCount, pipeline, payments, expenses, owed, attention, monthly] = await Promise.all([
+    const pipelineQuery=db.order.groupBy({by:['status'],where:{organizationId:org},_sum:{total:true},_count:true});
+    const [documentsCount, clientsCount, pipeline, totals, owed, attention, monthly] = await db.$transaction([
       db.document.count({where:{organizationId:org}}),
       db.client.count({ where: { organizationId: org } }),
-      db.order.groupBy({ by: ['status'], where: { organizationId: org }, _sum: { total: true }, _count: true }),
-      db.payment.aggregate({ where: { organizationId: org }, _sum: { amount: true } }),
-      db.expense.aggregate({ where: { organizationId: org }, _sum: { amount: true } }),
-      db.$queryRaw<{ outstanding: Prisma.Decimal }[]>`SELECT COALESCE(SUM(o.total - COALESCE(p.paid, 0)), 0) AS outstanding FROM "Order" o LEFT JOIN (SELECT "orderId", SUM(amount) AS paid FROM "Payment" WHERE "organizationId" = ${org}::uuid GROUP BY "orderId") p ON p."orderId" = o.id WHERE o."organizationId" = ${org}::uuid AND o.status != 'CANCELLED'`,
+      pipelineQuery,
+      db.$queryRaw<{received:Prisma.Decimal;expenses:Prisma.Decimal;cashFlow:Prisma.Decimal}[]>(Prisma.sql`SELECT ${receivedSql} AS received,${expensesSql} AS expenses,${cashFlowSql} AS "cashFlow" FROM (${movementSource(org)}) m`),
+      db.$queryRaw<{outstanding:Prisma.Decimal}[]>(Prisma.sql`SELECT COALESCE(SUM(o.total-COALESCE(p.paid,0)),0) AS outstanding FROM "Order" o LEFT JOIN (SELECT "orderId",${receivedSql} AS paid FROM (${movementSource(org)}) m GROUP BY "orderId") p ON p."orderId"=o.id WHERE o."organizationId"=${org}::uuid AND o.status!='CANCELLED'`),
       db.order.findMany({ where: { organizationId: org, status: { in: ['NEW', 'CONFIRMED', 'IN_PROGRESS'] } }, orderBy: [{ dueDate: 'asc' }, { createdAt: 'asc' }], take: 5 }),
-      db.$queryRaw<{ month: string; income: Prisma.Decimal; expense: Prisma.Decimal }[]>`WITH months AS (SELECT generate_series(date_trunc('month', now() AT TIME ZONE 'Asia/Almaty') - interval '5 months', date_trunc('month', now() AT TIME ZONE 'Asia/Almaty'), interval '1 month') AS month), ins AS (SELECT date_trunc('month', "createdAt" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Almaty') AS month, SUM(amount) AS amount FROM "Payment" WHERE "organizationId" = ${org}::uuid GROUP BY 1), outs AS (SELECT date_trunc('month', "createdAt" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Almaty') AS month, SUM(amount) AS amount FROM "Expense" WHERE "organizationId" = ${org}::uuid GROUP BY 1) SELECT to_char(m.month, 'YYYY-MM') AS month, COALESCE(i.amount,0) AS income, COALESCE(e.amount,0) AS expense FROM months m LEFT JOIN ins i ON i.month=m.month LEFT JOIN outs e ON e.month=m.month ORDER BY m.month`,
-    ]);
-    const received = amount(payments._sum.amount), spent = amount(expenses._sum.amount);
+      db.$queryRaw<{month:string;income:Prisma.Decimal;expense:Prisma.Decimal}[]>(Prisma.sql`WITH months AS (SELECT generate_series(date_trunc('month', now() AT TIME ZONE 'Asia/Almaty')-interval '5 months',date_trunc('month',now() AT TIME ZONE 'Asia/Almaty'),interval '1 month') AS month), movements AS (${movementSource(org)}), totals AS (SELECT date_trunc('month',"createdAt" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Almaty') AS month,${receivedSql} AS income,${expensesSql} AS expense FROM movements GROUP BY 1) SELECT to_char(m.month,'YYYY-MM') AS month,COALESCE(t.income,0) AS income,COALESCE(t.expense,0) AS expense FROM months m LEFT JOIN totals t ON t.month=m.month ORDER BY m.month`),
+    ],{isolationLevel:Prisma.TransactionIsolationLevel.RepeatableRead});
+    const received=amount(totals[0].received),spent=amount(totals[0].expenses);
     const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Almaty', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
     return {
       documentsCount, clientsCount, activeOrders: pipeline.filter(p => !['COMPLETED', 'CANCELLED'].includes(p.status)).reduce((s, p) => s + p._count, 0),
       completedValue: amount(pipeline.find(p => p.status === 'COMPLETED')?._sum.total), received, expenses: spent,
-      cashFlow: money(cents(received) - cents(spent)), outstanding: amount(owed[0]?.outstanding),
+      cashFlow: amount(totals[0].cashFlow), outstanding: amount(owed[0]?.outstanding),
       pipeline: stages.map(status => ({ status, count: pipeline.find(p => p.status === status)?._count ?? 0, total: amount(pipeline.find(p => p.status === status)?._sum.total) })),
       monthly: monthly.map(m => ({ label: m.month, income: amount(m.income), expense: amount(m.expense) })),
       attention: attention.map(o => ({ id: o.id, number: o.number, title: o.title,

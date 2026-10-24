@@ -1,3 +1,4 @@
+import {FinanceModule} from './modules/finance/finance.module';
 import {PrivacyRequestsModule} from './modules/privacy-requests/privacy-requests.module';
 import { DocumentsModule } from './modules/documents/documents.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
@@ -10,5 +11,5 @@ import { CrmModule } from './modules/crm/crm.module';
 import { AuthModule } from './auth/auth.module';
 import { DatabaseModule } from './database/database.module';
 import { HealthController } from './health.controller';
-@Module({imports:[PrivacyRequestsModule,DocumentsModule,NotificationsModule,OnboardingModule,DatabaseModule,AuthModule,CrmModule,TeamModule,TasksModule,ReportsModule],controllers:[HealthController]})
+@Module({imports:[FinanceModule,PrivacyRequestsModule,DocumentsModule,NotificationsModule,OnboardingModule,DatabaseModule,AuthModule,CrmModule,TeamModule,TasksModule,ReportsModule],controllers:[HealthController]})
 export class AppModule {}

@@ -1,4 +1,5 @@
 'use client';
+import {FinancialOperationDialog} from './financial-operation';
 import { useState } from 'react';
 import { ArrowDownLeft,ArrowUpRight,FileText,Wallet } from 'lucide-react';
 import { expenseLabels,type Movement,type MovementPage,type DocumentRecord } from '@tirek/contracts';
@@ -17,33 +18,35 @@ function Period({filters,reset}:{filters:ReturnType<typeof useFilters>;reset:()=
  const {t}=useI18n();
  return <div className="report-period"><label>{t('Дата с')}<input type="date" value={filters.from} onChange={e=>filters.setFrom(e.target.value)}/></label><label>{t('Дата по')}<input type="date" value={filters.to} onChange={e=>filters.setTo(e.target.value)}/></label><button className="button secondary" onClick={reset}>{t('Сбросить фильтры')}</button><span>{t('По дате записи · Алматы')}</span></div>;
 }
-export function FinanceReport({revision,onOrder}:{revision:unknown;onOrder:(id:string)=>void}){
+export function FinanceReport({revision,onOrder,onChanged}:{revision:unknown;onOrder:(id:string)=>void;onChanged:()=>void}){
  const {t,formatMoney,formatDate}=useI18n(),filters=useFilters();
  const [kind,setKind]=useState(''),[category,setCategory]=useState('');
+ const [selected,setSelected]=useState<{id:string;kind:'INCOME'|'EXPENSE'}|null>(null);
  const query=new URLSearchParams({...filters.params,...(kind?{kind}:{}),...(category?{category}:{})}).toString();
  const {result,error,busy,retry}=usePage<Movement,MovementPage>('/movements/search',query,revision);
  const summary=result?.summary;
- const categories=kind==='INCOME'?{ORDER_PAYMENT:'Оплата заказа'}:kind==='EXPENSE'?expenseLabels:{ORDER_PAYMENT:'Оплата заказа',...expenseLabels};
+ const categories=kind==='INCOME'?{ORDER_PAYMENT:'Оплата заказа'}:kind==='REFUND'?{ORDER_REFUND:'Возврат оплаты'}:kind==='EXPENSE'||kind==='EXPENSE_REVERSAL'?expenseLabels:{ORDER_PAYMENT:'Оплата заказа',ORDER_REFUND:'Возврат оплаты',...expenseLabels};
  const reportError=filters.invalid?'Начало периода позже окончания':error;
  return <div className="report-space"><section className="panel report-controls">
- <div className="table-toolbar"><div className="tabs">{[['','Все операции'],['INCOME','Поступления'],['EXPENSE','Расходы']].map(([value,label])=><button key={value} className={kind===value?'selected':''} onClick={()=>{setKind(value);setCategory('');filters.setPage(1);}}>{t(label)}</button>)}</div><SearchBox value={filters.q} setValue={filters.setQ} placeholder={t('Описание, заказ или клиент')}/></div>
+ <div className="table-toolbar"><div className="tabs">{[['','Все операции'],['INCOME','Поступления'],['EXPENSE','Расходы'],['REFUND','Возвраты'],['EXPENSE_REVERSAL','Сторнирования']].map(([value,label])=><button key={value} className={kind===value?'selected':''} onClick={()=>{setKind(value);setCategory('');filters.setPage(1);}}>{t(label)}</button>)}</div><SearchBox value={filters.q} setValue={filters.setQ} placeholder={t('Описание, заказ или клиент')}/></div>
  <div className="report-filter-row"><Period filters={filters} reset={()=>{filters.reset();setKind('');setCategory('');}}/><label className="filter-label">{t('Категория')}<select value={category} onChange={e=>{setCategory(e.target.value);filters.setPage(1);}}><option value="">{t('Все категории')}</option>{Object.entries(categories).map(([key,label])=><option key={key} value={key}>{t(label)}</option>)}</select></label></div>
  </section>
  <p className="report-scope">{t('Итоги по всем операциям с выбранными фильтрами')}</p>
  <div className="stats-grid report-stats" aria-busy={busy}>
- <Stat label={t('Поступления')} value={summary?formatMoney(summary.received):'—'} detail={t('Записанные оплаты')} icon={<ArrowDownLeft size={19}/>}/>
- <Stat label={t('Расходы')} value={summary?formatMoney(summary.expenses):'—'} detail={t('По выбранным фильтрам')} icon={<ArrowUpRight size={19}/>}/>
+ <Stat label={t('Поступления')} value={summary?formatMoney(summary.received):'—'} detail={t('С учётом возвратов в выборке')} icon={<ArrowDownLeft size={19}/>}/>
+ <Stat label={t('Расходы')} value={summary?formatMoney(summary.expenses):'—'} detail={t('С учётом сторнирований в выборке')} icon={<ArrowUpRight size={19}/>}/>
  <Stat label={t('Чистый денежный поток')} value={summary?formatMoney(summary.cashFlow):'—'} detail={t('Не является бухгалтерской прибылью')} icon={<Wallet size={19}/>} featured/>
  </div>
  <section className="panel" aria-busy={busy}>{reportError&&<div className="alert" role="alert">{t(reportError)}<button onClick={retry}>{t('Обновить')}</button></div>}
  <div className="table-wrap"><table className="report-table"><thead><tr><th>{t('Операция')}</th><th>{t('Категория')}</th><th>{t('Заказ')}</th><th>{t('Дата')}</th><th className="right">{t('Сумма')}</th></tr></thead><tbody>{result?.items.map(m=><tr key={m.kind+':'+m.id}>
- <td data-label={t('Операция')}><div className="movement-cell"><span className={'movement-icon '+m.kind.toLowerCase()}>{m.kind==='INCOME'?<ArrowDownLeft size={17}/>:<ArrowUpRight size={17}/>}</span><strong>{m.description}</strong></div></td>
- <td data-label={t('Категория')}>{t(m.category==='ORDER_PAYMENT'?'Оплата заказа':expenseLabels[m.category]??m.category)}</td>
- <td data-label={t('Заказ')}>{m.orderId?<button className="text-button" onClick={()=>onOrder(m.orderId!)}>№ {m.orderNumber}</button>:t('Общий расход')}</td><td data-label={t('Дата')}>{formatDate(m.createdAt,{day:'numeric',month:'short',year:'numeric'})}</td><td data-label={t('Сумма')} className={'right amount '+m.kind.toLowerCase()}>{m.kind==='INCOME'?'+':'−'}{formatMoney(m.amount)}</td>
+ <td data-label={t('Операция')}><div className="movement-cell"><span className={'movement-icon '+m.kind.toLowerCase()}>{(m.kind==='INCOME'||m.kind==='EXPENSE_REVERSAL')?<ArrowDownLeft size={17}/>:<ArrowUpRight size={17}/>}</span><strong>{m.description}</strong></div><small className="cell-sub">{t(m.kind==='REFUND'?'Возврат оплаты':m.kind==='EXPENSE_REVERSAL'?'Сторнирование расхода':m.kind==='INCOME'?'Поступления':'Расходы')}</small><button className="text-button" onClick={()=>setSelected({id:m.sourceId??m.id,kind:m.kind==='INCOME'||m.kind==='REFUND'?'INCOME':'EXPENSE'})}>{t('Открыть операцию')}</button></td>
+ <td data-label={t('Категория')}>{t(m.category==='ORDER_PAYMENT'?'Оплата заказа':m.category==='ORDER_REFUND'?'Возврат оплаты':expenseLabels[m.category]??m.category)}</td>
+ <td data-label={t('Заказ')}>{m.orderId?<button className="text-button" onClick={()=>onOrder(m.orderId!)}>№ {m.orderNumber}</button>:t('Общий расход')}</td><td data-label={t('Дата')}>{formatDate(m.createdAt,{day:'numeric',month:'short',year:'numeric'})}</td><td data-label={t('Сумма')} className={'right amount '+m.kind.toLowerCase()}>{(m.kind==='INCOME'||m.kind==='EXPENSE_REVERSAL')?'+':'−'}{formatMoney(m.amount)}</td>
  </tr>)}</tbody></table></div>
  {busy&&<Empty>{t('Загрузка…')}</Empty>}{!busy&&!reportError&&!result?.items.length&&<Empty>{t('За выбранный период и с этими фильтрами записей нет.')}</Empty>}
  <Pagination result={result} page={filters.page} setPage={filters.setPage} busy={busy}/>
  <div className="table-footer">{t('Учитываются внесённые записи. Синхронизация с банком не подключена.')}</div></section>
+ {selected&&<FinancialOperationDialog key={selected.kind+selected.id} {...selected} onClose={()=>{setSelected(null);retry();}} onSaved={()=>{retry();onChanged();}}/>}
  </div>;
 }
 export function DocumentDirectory({revision}:{revision:unknown}){

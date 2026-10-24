@@ -1,8 +1,9 @@
+import {movementSource,receivedSql,expensesSql,cashFlowSql} from '../finance/ledger';
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { MovementQuery, DocumentQuery } from '@tirek/contracts';
 import { Database } from '../../database/database.service';
-type MovementRow={id:string;kind:'INCOME'|'EXPENSE';amount:Prisma.Decimal;description:string;category:string;orderId:string|null;orderNumber:number|null;createdAt:Date};
+type MovementRow={id:string;kind:'INCOME'|'EXPENSE'|'REFUND'|'EXPENSE_REVERSAL';sourceId:string|null;amount:Prisma.Decimal;description:string;category:string;orderId:string|null;orderNumber:number|null;createdAt:Date};
 type DocumentRow={status:string;version:number;id:string;number:number;kind:string;orderId:string;orderNumber:number;clientName:string;total:string;createdAt:Date};
 type Totals={total:bigint;received:Prisma.Decimal;expenses:Prisma.Decimal;cashFlow:Prisma.Decimal};
 // UTC timestamps need explicit local boundaries. The upper bound is exclusive.
@@ -17,18 +18,7 @@ export class ReportsService {
  async movements(org:string,query:MovementQuery){
   const number=numericQuery(query.q);
   const source=Prisma.sql`WITH movements AS (
-   SELECT p.id, 'INCOME'::text AS kind, p.amount,
-    COALESCE(NULLIF(p.note,''),o.title) AS description, 'ORDER_PAYMENT'::text AS category,
-    p."orderId",o.number AS "orderNumber",p."createdAt",o.title AS "orderTitle",c.name AS "clientName"
-   FROM (SELECT * FROM "Payment" WHERE "organizationId"=${org}::uuid ${dates(query)}) p
-   JOIN "Order" o ON o.id=p."orderId" AND o."organizationId"=p."organizationId"
-   JOIN "Client" c ON c.id=o."clientId" AND c."organizationId"=o."organizationId"
-   UNION ALL
-   SELECT e.id, 'EXPENSE'::text AS kind, e.amount,e.description,e.category,
-    e."orderId",o.number AS "orderNumber",e."createdAt",o.title AS "orderTitle",c.name AS "clientName"
-   FROM (SELECT * FROM "Expense" WHERE "organizationId"=${org}::uuid ${dates(query)}) e
-   LEFT JOIN "Order" o ON o.id=e."orderId" AND o."organizationId"=e."organizationId"
-   LEFT JOIN "Client" c ON c.id=o."clientId" AND c."organizationId"=o."organizationId"
+${movementSource(org,query)}
   ), filtered AS (SELECT * FROM movements WHERE TRUE
    ${query.kind?Prisma.sql`AND kind=${query.kind}`:Prisma.empty}
    ${query.category?Prisma.sql`AND category=${query.category}`:Prisma.empty}
@@ -36,8 +26,8 @@ export class ReportsService {
    ${query.q?Prisma.sql`AND (strpos(lower(description),lower(${query.q}))>0 OR strpos(lower("orderTitle"),lower(${query.q}))>0 OR strpos(lower("clientName"),lower(${query.q}))>0 ${number===null?Prisma.empty:Prisma.sql`OR "orderNumber"=${number}`})`:Prisma.empty}
   )`;
   const [rows,totals]=await this.db.client.$transaction([
-   this.db.client.$queryRaw<MovementRow[]>(Prisma.sql`${source} SELECT id,kind,amount,description,category,"orderId","orderNumber","createdAt" FROM filtered ORDER BY "createdAt" DESC,id DESC,kind DESC LIMIT ${query.pageSize} OFFSET ${(query.page-1)*query.pageSize}`),
-   this.db.client.$queryRaw<Totals[]>(Prisma.sql`${source} SELECT count(*) AS total,COALESCE(sum(amount) FILTER (WHERE kind='INCOME'),0) AS received,COALESCE(sum(amount) FILTER (WHERE kind='EXPENSE'),0) AS expenses,COALESCE(sum(CASE WHEN kind='INCOME' THEN amount ELSE -amount END),0) AS "cashFlow" FROM filtered`),
+   this.db.client.$queryRaw<MovementRow[]>(Prisma.sql`${source} SELECT id,kind,amount,description,category,"sourceId","orderId","orderNumber","createdAt" FROM filtered ORDER BY "createdAt" DESC,id DESC,kind DESC LIMIT ${query.pageSize} OFFSET ${(query.page-1)*query.pageSize}`),
+   this.db.client.$queryRaw<Totals[]>(Prisma.sql`${source} SELECT count(*) AS total,${receivedSql} AS received,${expensesSql} AS expenses,${cashFlowSql} AS "cashFlow" FROM filtered`),
   ],{isolationLevel:Prisma.TransactionIsolationLevel.RepeatableRead});
   const summary=totals[0],total=Number(summary.total);
   return {items:rows.map(row=>({...row,amount:row.amount.toFixed(2)})),total,page:query.page,pageSize:query.pageSize,pages:Math.ceil(total/query.pageSize),

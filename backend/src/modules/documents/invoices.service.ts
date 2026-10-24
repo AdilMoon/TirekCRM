@@ -1,3 +1,4 @@
+import {paidCents} from '../../common/paid';
 import {ConflictException,Injectable,NotFoundException} from '@nestjs/common';
 import {Prisma} from '@prisma/client';
 import type {DocumentSnapshot,InvoiceInput} from '@tirek/contracts';
@@ -24,7 +25,7 @@ export class InvoicesService {
    if(!order)throw new NotFoundException('Заказ не найден');
    if(order.version!==input.orderVersion)throw new ConflictException('Заказ уже изменён. Откройте его заново');
    if(order.status==='CANCELLED')throw new ConflictException('Нельзя создать счёт для отменённого заказа');
-   const paid=order.payments.reduce((sum,p)=>sum+cents(p.amount.toFixed(2)),0n);
+   const paid=paidCents(order.payments);
    const amountDue=cents(order.total.toFixed(2))-paid;
    if(amountDue<=0n)throw new ConflictException('Заказ уже полностью оплачен');
    const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Almaty',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());

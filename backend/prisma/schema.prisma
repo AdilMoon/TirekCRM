@@ -134,6 +134,8 @@ model Payment {
   note           String @default("")
   idempotencyKey String @db.Uuid
   createdAt      DateTime @default(now())
+  refunds PaymentRefund[]
+  @@unique([id, organizationId])
   @@unique([organizationId, idempotencyKey])
   @@index([organizationId, createdAt])
   @@index([organizationId, createdAt, id])
@@ -149,6 +151,8 @@ model Expense {
   category       String
   idempotencyKey String @db.Uuid
   createdAt      DateTime @default(now())
+  reversal ExpenseReversal?
+  @@unique([id, organizationId])
   @@unique([organizationId, idempotencyKey])
   @@index([organizationId, createdAt])
   @@index([organizationId, createdAt, id])
@@ -305,4 +309,35 @@ model PrivacyRequestChangeReceipt {
  inputHash String @db.VarChar(64)
  createdAt DateTime @default(now())
  @@unique([organizationId,idempotencyKey])
+}
+
+model PaymentRefund {
+ id String @id @default(uuid()) @db.Uuid
+ organizationId String @db.Uuid
+ paymentId String @db.Uuid
+ payment Payment @relation(fields:[paymentId,organizationId],references:[id,organizationId],onDelete:Cascade)
+ amount Decimal @db.Decimal(18,2)
+ reason String
+ actorId String @db.Uuid
+ actorName String
+ idempotencyKey String @db.Uuid
+ createdAt DateTime @default(now())
+ @@unique([organizationId,idempotencyKey])
+ @@index([organizationId,createdAt,id])
+ @@index([paymentId,organizationId])
+}
+model ExpenseReversal {
+ id String @id @default(uuid()) @db.Uuid
+ organizationId String @db.Uuid
+ expenseId String @db.Uuid
+ expense Expense @relation(fields:[expenseId,organizationId],references:[id,organizationId],onDelete:Cascade)
+ amount Decimal @db.Decimal(18,2)
+ reason String
+ actorId String @db.Uuid
+ actorName String
+ idempotencyKey String @db.Uuid
+ createdAt DateTime @default(now())
+ @@unique([expenseId,organizationId])
+ @@unique([organizationId,idempotencyKey])
+ @@index([organizationId,createdAt,id])
 }

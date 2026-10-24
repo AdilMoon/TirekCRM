@@ -10,6 +10,7 @@ import { api } from '../lib/api';
 export function TaskDiscussion({task,close,onSessionExpired}:{task:BusinessTask;close:()=>void;onSessionExpired?:()=>void}) {
  const {t,formatDate}=useI18n();
  const [page,setPage]=useState(1),[body,setBody]=useState(''),[sending,setSending]=useState(false);
+ const [uncertain,setUncertain]=useState(false);
  const [error,setError]=useState(''),[notice,setNotice]=useState(''),[accessLost,setAccessLost]=useState(false);
  const pending=useRef<{body:string;key:string}|null>(null),inFlight=useRef(false);
  const path='/tasks/'+task.id+'/comments';
@@ -24,13 +25,15 @@ export function TaskDiscussion({task,close,onSessionExpired}:{task:BusinessTask;
   if(!text||inFlight.current||accessLost)return;
   inFlight.current=true;setSending(true);setError('');setNotice('');
   // Retain the operation key after an uncertain network result.
-  if(!pending.current||pending.current.body!==text)pending.current={body:text,key:crypto.randomUUID()};
+  if(!pending.current)pending.current={body:text,key:crypto.randomUUID()};
   try{
-   await api<TaskComment>(path,{method:'POST',body:JSON.stringify({body:text,idempotencyKey:pending.current.key})});
-   setBody('');pending.current=null;setNotice('Комментарий добавлен');setPage(1);list.retry();
+   await api<TaskComment>(path,{method:'POST',body:JSON.stringify({body:pending.current.body,idempotencyKey:pending.current.key})});
+   setBody('');pending.current=null;setUncertain(false);setNotice('Комментарий добавлен');setPage(1);list.retry();
   }catch(e){
    const failure=e as Error&{status?:number};
    setError(failure.status?failure.message:'Не удалось связаться с сервером');
+   if(!failure.status||failure.status>=500)setUncertain(true);
+   else if(!uncertain)pending.current=null;
    if(failure.status===401)onSessionExpired?.();
    if(failure.status===403||failure.status===404)setAccessLost(true);
   }finally{inFlight.current=false;setSending(false);}
@@ -43,10 +46,11 @@ export function TaskDiscussion({task,close,onSessionExpired}:{task:BusinessTask;
  {(error||list.error)&&<div className="alert" role="alert">{t(error||list.error)}</div>}
  {notice&&<p className="task-notice" role="status">{t(notice)}</p>}
  {accessLost?<p role="status">{t('Доступ к обсуждению изменился. Закройте окно и обновите задачи.')}</p>:<>
+ {uncertain&&<p className="alert" role="status">{t('Результат отправки неизвестен. Повторите исходное сообщение, не закрывая окно. Текст временно заблокирован для защиты от дубликата.')}</p>}
  <form className="editor-form" onSubmit={submit}>
- <label>{t('Комментарий')}<textarea rows={3} maxLength={2000} required value={body} disabled={sending}
+ <label>{t('Комментарий')}<textarea rows={3} maxLength={2000} required value={body} disabled={sending||uncertain}
  onChange={event=>{setBody(event.target.value);setNotice('');}}/></label>
- <div className="form-actions"><button type="submit" className="button primary" disabled={sending||!body.trim()||list.busy||!!list.error}>{t(sending?'Отправка…':'Отправить комментарий')}</button></div>
+ <div className="form-actions"><button type="submit" className="button primary" disabled={sending||!body.trim()||list.busy||!!list.error}>{t(sending?'Отправка…':uncertain?'Повторить отправку':'Отправить комментарий')}</button></div>
  </form>
  <div className="discussion-heading"><h4>{t('Комментарии')}</h4><button className="button secondary" disabled={sending||list.busy} onClick={()=>{setError('');list.retry();}}>{t('Обновить')}</button></div>
  {list.busy&&<p role="status">{t('Загрузка…')}</p>}

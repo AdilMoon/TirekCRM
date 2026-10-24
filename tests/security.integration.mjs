@@ -15,7 +15,7 @@ const base=process.env.TEST_API_URL??'http://127.0.0.1:4000/api',origin=process.
 const password='SecurityFixture2026!',nextPassword='ChangedSecurity2026!',orgs=[];
 async function req(path,{cookie,method='GET',body,source=origin,agent='Security integration'}={}){
  const response=await fetch(base+path,{method,headers:{Origin:source,'User-Agent':agent,...(cookie?{Cookie:cookie}:{}),...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined});
- return {retryAfter:response.headers.get('retry-after'),status:response.status,body:await response.json(),setCookie:response.headers.get('set-cookie'),cookie:response.headers.get('set-cookie')?.split(';')[0]};
+ return {cacheControl:response.headers.get('cache-control'),retryAfter:response.headers.get('retry-after'),status:response.status,body:await response.json(),setCookie:response.headers.get('set-cookie'),cookie:response.headers.get('set-cookie')?.split(';')[0]};
 }
 async function tenant(){
  const id=randomUUID();orgs.push(id);
@@ -36,7 +36,7 @@ test('Account security boundaries, revocation and credential races',async t=>{
  let current=await session(owner),other=await session(owner),worker=await session(employee);
  const outsider=await session(foreign),expired=await session(owner,{expiresAt:new Date(Date.now()-1000)}),legacy=await session(owner,{createdAt:null,userAgent:''});
  await t.test('session list is scoped to the account and exposes only safe metadata',async()=>{
-  const result=await req('/auth/sessions',current);assert.equal(result.status,200);assert.equal(result.body.length,3);
+  const result=await req('/auth/sessions',current);assert.equal(result.status,200);assert.equal(result.cacheControl,'no-store');assert.equal(result.body.length,3);
   assert.deepEqual(result.body.map(s=>s.id).sort(),[current.id,other.id,legacy.id].sort());
   for(const item of result.body)assert.deepEqual(Object.keys(item).sort(),['createdAt','current','expiresAt','id','userAgent']);
   assert.equal(result.body.filter(s=>s.current).length,1);assert.equal(result.body.find(s=>s.current).id,current.id);

@@ -41,19 +41,28 @@ test('owner records discussion, retries lost response once, pages and switches R
   if(route.request().method()!=='POST'){await route.continue();return;}
   keys.push(route.request().postDataJSON().idempotencyKey);
   if(lost){lost=false;await route.fetch();await route.abort('failed');}
+  else if(keys.length===2)await route.fulfill({status:429,contentType:'application/json',body:JSON.stringify({message:'Слишком много запросов. Попробуйте позже.'})});
   else await route.continue();
  });
+ await page.setViewportSize({width:390,height:844});
  await dialog.getByRole('textbox',{name:'Комментарий',exact:true}).fill(value);
  await dialog.getByRole('button',{name:'Отправить комментарий'}).click();
  await expect(dialog.getByRole('alert')).toContainText('Не удалось связаться с сервером');
  await expect(dialog.getByRole('textbox',{name:'Комментарий',exact:true})).toHaveValue(value);
- await dialog.getByRole('button',{name:'Отправить комментарий'}).click();
+ await expect(dialog.getByRole('textbox',{name:'Комментарий',exact:true})).toBeDisabled();
+ await dialog.getByRole('button',{name:'Повторить отправку',exact:true}).click();
+ await expect(dialog.getByRole('alert')).toContainText('Слишком много запросов');
+ await expect(dialog.getByRole('status')).toContainText('Результат отправки неизвестен');
+ expect(await dialog.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
+ await dialog.screenshot({path:'test-results/task-discussion-uncertain-mobile.png'});
+ await expect(dialog.getByRole('textbox',{name:'Комментарий',exact:true})).toBeDisabled();
+ await dialog.getByRole('button',{name:'Повторить отправку',exact:true}).click();
  await expect(dialog.getByRole('status').filter({hasText:'Комментарий добавлен'})).toHaveText('Комментарий добавлен');
  await expect(dialog.locator('.task-comment')).toHaveCount(20);
  await expect(dialog.locator('.task-comment').first()).toContainText(value);
  await expect(dialog.locator('.task-comment img')).toHaveCount(0);
  await expect(dialog.getByRole('textbox',{name:'Комментарий',exact:true})).toHaveValue('');
- expect(keys.length).toBe(2);expect(keys[0]).toBe(keys[1]);
+ expect(keys.length).toBe(3);expect(new Set(keys).size).toBe(1);
  expect(await db.taskComment.count({where:{organizationId,taskId,body:value}})).toBe(1);
  await page.unroute('**/api/tasks/'+taskId+'/comments');
  await page.setViewportSize({width:390,height:844});

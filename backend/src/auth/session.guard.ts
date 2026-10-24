@@ -12,8 +12,9 @@ export async function hashPassword(password: string) {
   return `${salt}:${key.toString('hex')}`;
 }
 export async function verifyPassword(password: string, stored: string) {
+  // Reject malformed stored credentials before decoding or constant-time comparison.
+  if (!/^[a-f0-9]{32}:[a-f0-9]{128}$/.test(stored)) return false;
   const [salt, hash] = stored.split(':');
-  if (!salt || !hash || hash.length !== 128) return false;
   const candidate = await scrypt(password, salt, 64) as Buffer;
   return timingSafeEqual(candidate, Buffer.from(hash, 'hex'));
 }

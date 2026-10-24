@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import type { MovementQuery, DocumentQuery } from '@tirek/contracts';
 import { Database } from '../../database/database.service';
 type MovementRow={id:string;kind:'INCOME'|'EXPENSE';amount:Prisma.Decimal;description:string;category:string;orderId:string|null;orderNumber:number|null;createdAt:Date};
-type DocumentRow={id:string;number:number;kind:string;orderId:string;orderNumber:number;clientName:string;total:string;createdAt:Date};
+type DocumentRow={status:string;version:number;id:string;number:number;kind:string;orderId:string;orderNumber:number;clientName:string;total:string;createdAt:Date};
 type Totals={total:bigint;received:Prisma.Decimal;expenses:Prisma.Decimal;cashFlow:Prisma.Decimal};
 // UTC timestamps need explicit local boundaries. The upper bound is exclusive.
 function dates(query:{from?:string;to?:string}) {
@@ -47,10 +47,11 @@ export class ReportsService {
   const number=numericQuery(query.q);
   // Search immutable snapshot data, not the current client/order name.
   const source=Prisma.sql`WITH filtered AS (
-   SELECT id,number,kind,"orderId",(snapshot->>'orderNumber')::integer AS "orderNumber",
+   SELECT id,number,kind,status,version,"orderId",(snapshot->>'orderNumber')::integer AS "orderNumber",
     snapshot->'client'->>'name' AS "clientName",COALESCE(snapshot->'invoice'->>'amountDue',snapshot->>'total') AS total,"createdAt"
    FROM "Document" WHERE "organizationId"=${org}::uuid ${dates(query)}
    ${query.kind?Prisma.sql`AND kind=${query.kind}`:Prisma.empty}
+   ${query.status?Prisma.sql`AND status=${query.status}`:Prisma.empty}
    ${query.orderId?Prisma.sql`AND "orderId"=${query.orderId}::uuid`:Prisma.empty}
    ${query.q?Prisma.sql`AND (strpos(lower(snapshot->'client'->>'name'),lower(${query.q}))>0 OR strpos(lower(snapshot->'client'->>'company'),lower(${query.q}))>0 OR strpos(lower(snapshot->>'title'),lower(${query.q}))>0 ${number===null?Prisma.empty:Prisma.sql`OR number=${number} OR (snapshot->>'orderNumber')::integer=${number}`})`:Prisma.empty}
   )`;

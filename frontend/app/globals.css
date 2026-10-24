@@ -48,3 +48,9 @@
 .requisite-fields,.invoice-fields{border:0;margin:0;padding:0;display:grid;gap:16px;min-width:0}.requisite-fields{border-top:1px solid var(--line);padding-top:18px}.requisite-fields legend{padding:0 8px 0 0;font-size:13px;font-weight:600}.invoice-preview{display:grid;gap:9px;padding:20px;background:#f0f7f4;border:1px solid #dbece3;border-radius:12px;overflow-wrap:anywhere}.invoice-preview span,.invoice-preview small{color:var(--muted);font-size:12px}.invoice-preview strong{font-size:26px;color:var(--green)}.document-sheet{overflow-wrap:anywhere}.document-sheet table{table-layout:fixed;width:100%}.document-sheet th:first-child{width:6%}.document-sheet th:nth-child(2){width:38%}.document-sheet th:nth-child(3){width:12%}.document-sheet th:nth-child(4),.document-sheet th:nth-child(5){width:22%}.document-sheet td{white-space:normal;overflow-wrap:anywhere}.invoice-totals{border-top:1px solid var(--line);text-align:right}.invoice-totals p{display:flex;justify-content:flex-end;gap:20px;flex-wrap:wrap;font-size:14px}.invoice-totals p:last-child{font-size:18px;color:var(--green)}.invoice-note{white-space:pre-wrap}.document-toolbar{gap:12px;flex-wrap:wrap}.document-toolbar .button{white-space:normal}@media print{.document-sheet thead{display:table-header-group}.invoice-totals{break-inside:avoid}}
 
 .document-sheet th{white-space:normal;overflow-wrap:anywhere;line-height:1.5}.invoice-totals p{row-gap:6px}
+
+.document-annulled { border:2px solid #9f2539; padding:16px; margin:20px 0; color:#742030; }
+.document-annulled p { white-space:pre-wrap; overflow-wrap:anywhere; }
+.document-toolbar { flex-wrap:wrap; }
+.document-action-error { max-width:900px; margin:12px auto; }
+@media print { .document-action-error,.document-page .modal { display:none; } .document-annulled { break-inside:avoid; } }

@@ -1,13 +1,18 @@
 'use client';
 import {useI18n,LanguageSwitcher} from '../../../i18n/provider';
-import {use,useEffect,useState} from 'react';
-import type {DocumentSnapshot,DocumentRecord} from '@tirek/contracts';
+import {use,useEffect,useState,useRef} from 'react';
+import {flushSync} from 'react-dom';
+import {DocumentAnnulment} from '../../../features/document-annulment';
+import type {DocumentSnapshot,PrintableDocument} from '@tirek/contracts';
 import {api} from '../../../lib/api';
 import {Printer,ArrowLeft,FileText} from 'lucide-react';
-type PrintableDocument={number:number;createdAt:string;kind:DocumentRecord['kind'];snapshot:DocumentSnapshot};
 export default function DocumentPage({params}:{params:Promise<{id:string}>}){
  const {t,formatDate,formatMoney}=useI18n(),{id}=use(params);
  const [doc,setDoc]=useState<PrintableDocument|null>(null),[error,setError]=useState('');
+ const [annulling,setAnnulling]=useState(false),[actionError,setActionError]=useState(''),[printing,setPrinting]=useState(false);
+ const printLock=useRef(false);
+ async function refresh(){try{const value=await api<PrintableDocument>('/documents/'+id);setDoc(previous=>previous?.id===value.id&&previous.version>value.version?previous:value);setActionError('');}catch(e){setActionError(e instanceof Error?e.message:'Не удалось связаться с сервером');}}
+ async function print(){if(printLock.current)return;printLock.current=true;setPrinting(true);setActionError('');try{const value=await api<PrintableDocument>('/documents/'+id);flushSync(()=>setDoc(previous=>previous?.id===value.id&&previous.version>value.version?previous:value));window.print();}catch(e){setActionError(e instanceof Error?e.message:'Не удалось связаться с сервером');}finally{printLock.current=false;setPrinting(false);}}
  useEffect(()=>{let active=true;setDoc(null);setError('');api<PrintableDocument>('/documents/'+id).then(value=>{if(active)setDoc(value);}).catch(e=>{if(active)setError(e.message);});return()=>{active=false;};},[id]);
  if(error)return <div className="boot"><p role="alert">{t(error)}</p><a href="/">{t('Вернуться в CRM')}</a></div>;
  if(!doc)return <div className="boot">{t('Загружаем документ…')}</div>;
@@ -15,8 +20,11 @@ export default function DocumentPage({params}:{params:Promise<{id:string}>}){
  function bank(details:DocumentSnapshot['organization']){
   return <>{details.bankName&&<p>{t('Банк')}: {details.bankName}</p>}{details.iban&&<p>{t('ИИК / IBAN')}: {details.iban}</p>}{details.bic&&<p>{t('БИК')}: {details.bic}</p>}</>;
  }
- return <div className="document-page"><div className="document-toolbar"><LanguageSwitcher/><a href="/" className="text-button"><ArrowLeft size={17}/>{t('В пространство')}</a><button className="button primary" onClick={()=>window.print()}><Printer size={17}/>{t('Печать / PDF')}</button></div>
+ return <div className="document-page"><div className="document-toolbar"><LanguageSwitcher/><a href="/" className="text-button"><ArrowLeft size={17}/>{t('В пространство')}</a><button className="button primary" disabled={printing} onClick={print}><Printer size={17}/>{t('Печать / PDF')}</button>{doc.status==='DRAFT'&&<button className="button secondary" onClick={()=>setAnnulling(true)}>{t('Аннулировать черновик')}</button>}<button className="button secondary" onClick={refresh}>{t('Обновить')}</button></div>
+ {actionError&&<p className="alert document-action-error" role="alert">{t(actionError)}</p>}
+ {annulling&&<DocumentAnnulment doc={doc} onClose={()=>{setAnnulling(false);void refresh();}} onSaved={value=>{setDoc(value);setAnnulling(false);}}/>}
  <article className="document-sheet"><div className="document-brand"><FileText size={25}/>Tirek <span>{t('Черновик · без подписи')}</span></div>
+ {doc.status==='ANNULLED'&&<section className="document-annulled" aria-label={t('Черновик аннулирован')}><strong>{t('Черновик аннулирован')}</strong><p>{formatDate(doc.annulledAt!,{year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Almaty'})} · {doc.annulledByName}</p><p>{doc.annulmentReason}</p><p>{t('Аннулирование в CRM не отменяет подписанные документы и платежи.')}</p></section>}
  <h1>{t(invoice?'Счёт на оплату':'Акт выполненных работ')}</h1><p>№ {String(doc.number).padStart(4,'0')} {t('от')} {formatDate(doc.createdAt,{dateStyle:'long',timeZone:'Asia/Almaty'})}</p>
  {invoice?.dueDate&&<p>{t('Оплатить до')}: {formatDate(invoice.dueDate,{dateStyle:'long'})}</p>}
  <div className="document-parties"><div><small>{t('ИСПОЛНИТЕЛЬ')}</small><h3>{s.organization.name}</h3><p>{s.organization.address||t('Адрес не указан')}</p><p>{t('ИИН/БИН:')} {s.organization.businessId||t('не указан')}</p>{bank(s.organization)}</div>

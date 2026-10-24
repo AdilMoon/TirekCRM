@@ -11,7 +11,7 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
     "db:seed": "node --env-file=../.env dist/seed.js",
-    "test": "npm run build && node --test dist/common/money.test.js dist/auth/password.test.js"
+    "test": "npm run build && node --test dist/common/money.test.js dist/auth/password.test.js dist/common/api-errors.test.js"
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.2",

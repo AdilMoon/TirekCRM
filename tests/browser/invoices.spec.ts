@@ -97,3 +97,61 @@ test('ambiguous create response and throttled retry keep one immutable request',
  await expect(page.getByRole('dialog')).toHaveCount(0);
  expect(new Set(bodies).size).toBe(1);expect(await db.document.count({where:{organizationId}})).toBe(1);
 });
+
+
+test('annulment survives lost response, is visible in registry and in RU KK EN print on mobile',async({page,context},testInfo)=>{
+ await signIn(context);
+ const issued=await page.request.post('/api/orders/'+orderId+'/invoices',{headers:{Origin:'http://localhost:3000'},data:{orderVersion:1,idempotencyKey:randomUUID()}});
+ expect(issued.status()).toBe(201);const document=await issued.json();
+ await page.setViewportSize({width:390,height:844});await page.goto('/documents/'+document.id);
+ await page.getByRole('button',{name:'Аннулировать черновик',exact:true}).click();
+ const reason='Wrong details <img src=x onerror=alert(1)>\n'+'Ж'.repeat(200);
+ await page.getByLabel('Причина аннулирования',{exact:true}).fill(reason);
+ let calls=0;const bodies:string[]=[];
+ await page.route('**/api/documents/*/annul',async route=>{
+  calls++;bodies.push(route.request().postData()!);
+  if(calls===1){const response=await route.fetch();expect(response.status()).toBe(201);await route.abort('failed');}
+  else await route.continue();
+ });
+ await page.getByRole('button',{name:'Подтвердить аннулирование',exact:true}).click();
+ await expect(page.locator('.document-page').getByRole('alert')).toContainText('Не удалось связаться с сервером');
+ await expect(page.getByLabel('Причина аннулирования',{exact:true})).toBeDisabled();
+ await page.getByRole('button',{name:'Подтвердить аннулирование',exact:true}).click();
+ await expect(page.getByRole('dialog')).toHaveCount(0);
+ await expect(page.locator('.document-annulled')).toContainText(reason);
+ expect(new Set(bodies).size).toBe(1);
+ expect(await db.auditEvent.count({where:{organizationId,action:'DOCUMENT_ANNULLED'}})).toBe(1);
+ expect(await page.locator('article img,article script').count()).toBe(0);
+ for(const [locale,label]of [['kk','Жобаның күші жойылды'],['en','Draft annulled'],['ru','Черновик аннулирован']]){
+  await page.locator('.language-switcher select').selectOption(locale);
+  await expect(page.locator('.document-annulled strong')).toHaveText(label);
+  const saved=await db.document.findUniqueOrThrow({where:{id:document.id}});
+  const clock=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Almaty',hour:'2-digit',minute:'2-digit',hour12:false}).format(saved.annulledAt!);
+  await expect(page.locator('.document-annulled')).toContainText(clock);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+ }
+ await page.screenshot({path:testInfo.outputPath('annulled-mobile.png'),fullPage:true});
+ await page.setViewportSize({width:794,height:1123});await page.emulateMedia({media:'print'});await expect(page.locator('.document-annulled')).toBeVisible();await expect(page.locator('.document-toolbar')).not.toBeVisible();
+ await page.screenshot({path:testInfo.outputPath('annulled-print.png'),fullPage:true});
+ await page.emulateMedia({media:'screen'});await page.setViewportSize({width:1280,height:900});await page.goto('/');
+ await page.getByRole('button',{name:'Документы',exact:true}).click();
+ await page.getByRole('combobox',{name:'Статус документа',exact:true}).selectOption('ANNULLED');
+ await expect(page.getByRole('cell',{name:'Счёт № 0001 Черновик аннулирован'})).toBeVisible();
+ await page.getByRole('combobox',{name:'Статус документа',exact:true}).selectOption('DRAFT');
+ await expect(page.getByRole('link',{name:'Открыть',exact:true})).toHaveCount(0);
+});
+
+test('print revalidates external annulment and fails closed when status cannot be fetched',async({page,context})=>{
+ await signIn(context);
+ const issued=await page.request.post('/api/orders/'+orderId+'/invoices',{headers:{Origin:'http://localhost:3000'},data:{orderVersion:1,idempotencyKey:randomUUID()}});
+ const document=await issued.json();await page.goto('/documents/'+document.id);
+ await expect(page.getByRole('button',{name:'Аннулировать черновик',exact:true})).toBeVisible();
+ await page.evaluate(()=>{(window as unknown as {printed:string[]}).printed=[];window.print=()=>{(window as unknown as {printed:string[]}).printed.push(document.querySelector('.document-annulled')?.textContent??'MISSING');};});
+ const response=await page.request.post('/api/documents/'+document.id+'/annul',{headers:{Origin:'http://localhost:3000'},data:{version:1,reason:'External annulment',idempotencyKey:randomUUID()}});expect(response.status()).toBe(201);
+ await page.getByRole('button',{name:'Печать / PDF',exact:true}).click();
+ await expect.poll(()=>page.evaluate(()=>(window as unknown as {printed:string[]}).printed)).toEqual([expect.stringContaining('External annulment')]);
+ await page.route('**/api/documents/'+document.id,route=>route.abort('failed'));
+ await page.getByRole('button',{name:'Печать / PDF',exact:true}).click();
+ await expect(page.locator('.document-page').getByRole('alert')).toContainText('Не удалось связаться с сервером');
+ expect(await page.evaluate(()=>(window as unknown as {printed:string[]}).printed.length)).toBe(1);
+});

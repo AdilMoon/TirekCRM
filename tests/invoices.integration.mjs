@@ -151,6 +151,74 @@ test('client requisites and immutable payment invoices',async t=>{
    if(issued.status===201){assert.equal(issued.body.snapshot.invoice.paid,'0.00');assert.equal(issued.body.snapshot.invoice.amountDue,'30.03');}
    assert.equal((await req('/orders/'+concurrent.id,a)).body.debt,'29.02');
   });
+
+  const annul=(identity,id,body)=>req('/documents/'+id+'/annul',{...identity,method:'POST',body});
+  const annulInput=(extra={})=>({version:1,reason:'Incorrect bank details',idempotencyKey:randomUUID(),...extra});
+  await t.test('annulment enforces tenant, role, session, Origin and strict input',async()=>{
+   for(const [identity,expected] of [[{},401],[{cookie:a.worker},403],[b,404]])
+    assert.equal((await annul(identity,document.id,annulInput())).status,expected);
+   assert.equal((await req('/documents/'+document.id+'/annul',{...a,method:'POST',source:'https://evil.invalid',body:annulInput()})).status,403);
+   for(const extra of [{version:0},{version:2.5},{version:2147483648},{reason:'  '},{reason:'ab'},{reason:'x'.repeat(501)},{reason:'bad\u0000input'},{reason:'ab\ud800'},{reason:'😀a'},{status:'DRAFT'},{organizationId:b.id},{idempotencyKey:'invalid'}])
+    assert.equal((await annul(a,document.id,annulInput(extra))).status,400,JSON.stringify(extra));
+   assert.equal((await annul(a,document.id,annulInput({version:2}))).status,409);
+   assert.equal((await req('/documents/search?status=INVALID',a)).status,400);
+   assert.equal((await db.document.findUniqueOrThrow({where:{id:document.id}})).status,'DRAFT');
+  });
+  await t.test('concurrent identical annulments produce one event and preserve money and snapshot',async()=>{
+   const before=(await req('/orders/'+order.id,a)).body;
+   const payload=annulInput({reason:'Reason <script>alert(1)</script>\nSecond line'});
+   const results=await Promise.all([1,2,3].map(()=>annul(a,document.id,payload)));
+   assert.deepEqual(results.map(r=>r.status),[201,201,201]);
+   assert.ok(results.every(r=>r.body.status==='ANNULLED'&&r.body.version===2));
+   assert.equal(new Set(results.map(r=>r.body.annulledAt)).size,1);
+   assert.ok(Number.isFinite(Date.parse(results[0].body.annulledAt)));
+   assert.deepEqual(results[0].body.snapshot,document.snapshot);
+   assert.equal(results[0].body.annulmentReason,payload.reason);
+   assert.deepEqual((await req('/orders/'+order.id,a)).body,before);
+   const events=await db.auditEvent.findMany({where:{organizationId:a.id,action:'DOCUMENT_ANNULLED'}});
+   assert.equal(events.length,1);assert.equal(events[0].metadata.documentId,document.id);
+   assert.equal('reason' in events[0].metadata,false);
+   assert.equal((await annul(a,document.id.toUpperCase(),{...payload,idempotencyKey:payload.idempotencyKey.toUpperCase()})).status,201);
+   assert.equal((await annul(a,document.id,{...payload,reason:'Another reason'})).status,409);
+   assert.equal((await annul(a,document.id,annulInput())).status,409);
+   assert.equal((await annul(a,document.id,{...payload,version:2})).status,409);
+   const other=await db.document.findFirstOrThrow({where:{organizationId:a.id,status:'DRAFT'}});
+   assert.equal((await annul(a,other.id,payload)).status,409);
+   const found=(await req('/documents/search?status=ANNULLED',a)).body;
+   assert.equal(found.total,1);assert.equal(found.items[0].id,document.id);assert.equal(found.items[0].version,2);
+   assert.equal((await req('/documents/search?status=ANNULLED',b)).body.total,0);
+   assert.ok((await req('/documents',a)).body.some(d=>d.id===document.id&&d.status==='ANNULLED'));
+  });
+  await t.test('different concurrent reasons cannot overwrite an annulment; invoice retry cannot revive it',async()=>{
+   const current=(await req('/orders/'+order.id,a)).body,payload=input(current);
+   const issued=(await invoice(a,current,payload)).body;
+   const results=await Promise.all(['First reason','Second reason'].map(reason=>annul(a,issued.id,annulInput({reason}))));
+   assert.deepEqual(results.map(r=>r.status).sort(),[201,409]);
+   const retried=await invoice(a,current,payload);assert.equal(retried.status,201);assert.equal(retried.body.status,'ANNULLED');
+   assert.equal(retried.body.annulmentReason,results.find(r=>r.status===201).body.annulmentReason);
+   assert.equal(await db.auditEvent.count({where:{organizationId:a.id,action:'DOCUMENT_ANNULLED',metadata:{path:['documentId'],equals:issued.id}}}),1);
+  });
+  await t.test('acts use the same lifecycle without changing a completed order',async()=>{
+   const completed=await createOrder(a,client.id);
+   await db.order.update({where:{id:completed.id},data:{status:'COMPLETED'}});
+   const act=await req('/orders/'+completed.id+'/documents',{...a,method:'POST',body:{}});
+   assert.equal(act.status,201);assert.equal(act.body.kind,'ACT_DRAFT');
+   const result=await annul(a,act.body.id,annulInput());
+   assert.equal(result.status,201);assert.deepEqual(result.body.snapshot,act.body.snapshot);
+   assert.equal((await req('/orders/'+completed.id,a)).body.status,'COMPLETED');
+  });
+
+  await t.test('audit failure rolls back annulment and service rejects a stale disabled owner',async()=>{
+   const {AnnulmentService}=await import('../backend/dist/modules/documents/annulment.service.js');
+   const owner=await db.user.findFirstOrThrow({where:{organizationId:a.id,role:'OWNER'}});
+   const target=await db.document.findFirstOrThrow({where:{organizationId:a.id,status:'DRAFT'}});
+   const service=new AnnulmentService({client:db},{record:()=>{throw new Error('simulated audit outage');}});
+   await assert.rejects(service.annul(a.id,target.id,annulInput(),owner),/simulated audit outage/);
+   assert.deepEqual(await db.document.findUniqueOrThrow({where:{id:target.id}}),target);
+   await db.user.update({where:{id:owner.id},data:{isActive:false}});
+   try{await assert.rejects(service.annul(a.id,target.id,annulInput(),owner),e=>e.getStatus()===403);}
+   finally{await db.user.update({where:{id:owner.id},data:{isActive:true}});}
+  });
  }finally{
   await server.stop();
   for(const organizationId of orgs){

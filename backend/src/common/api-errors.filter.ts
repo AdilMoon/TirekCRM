@@ -2,6 +2,7 @@ import { Catch, ExceptionFilter, ArgumentsHost, Logger, HttpException } from '@n
 import type { FastifyReply } from 'fastify';
 import { ZodError } from 'zod';
 import { Prisma } from '@prisma/client';
+import { randomUUID } from 'node:crypto';
 @Catch()
 export class ApiErrors implements ExceptionFilter {
   private readonly logger = new Logger('API');
@@ -12,7 +13,11 @@ export class ApiErrors implements ExceptionFilter {
     if(error instanceof Prisma.PrismaClientKnownRequestError && ['P2002','P2003','P2025'].includes(error.code)){
       reply.status(error.code==='P2025'?404:409).send({code:'DATA_CONFLICT',message:'Данные изменились. Обновите страницу и повторите действие'});return;
     }
-    this.logger.error(error instanceof Error ? error.stack : 'Unexpected error');
-    reply.status(500).send({ message: 'Не удалось выполнить операцию. Попробуйте ещё раз' });
+    // Error stacks/messages and Prisma metadata may embed customer data or credentials.
+    const errorId=randomUUID();
+    const category=error instanceof Prisma.PrismaClientKnownRequestError?'DATABASE_ERROR':'UNEXPECTED_ERROR';
+    const code=error instanceof Prisma.PrismaClientKnownRequestError&&/^P\d{4}$/.test(error.code)?error.code:undefined;
+    this.logger.error({errorId,category,...(code?{code}:{})});
+    reply.status(500).send({ errorId, message: 'Не удалось выполнить операцию. Попробуйте ещё раз' });
   }
 }

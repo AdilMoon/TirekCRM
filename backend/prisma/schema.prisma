@@ -161,9 +161,17 @@ model Document {
   number         Int
   kind           String @default("ACT_DRAFT")
   idempotencyKey String? @db.Uuid
+  status         String @default("DRAFT")
+  version        Int @default(1)
+  annulledAt     DateTime?
+  annulledById   String? @db.Uuid
+  annulledByName String?
+  annulmentReason String?
+  annulmentKey   String? @db.Uuid
   snapshot       Json
   createdAt      DateTime @default(now())
   @@unique([organizationId, number])
+  @@unique([organizationId, annulmentKey])
   @@unique([organizationId, idempotencyKey])
   @@index([organizationId, createdAt])
   @@index([organizationId, createdAt, id])

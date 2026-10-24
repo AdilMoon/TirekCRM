@@ -57,3 +57,7 @@ OnboardingModule предоставляет публичные GET /onboarding/s
 
 ## Реквизиты и счета (14.10.2026)
 PATCH /clients/:id и PATCH /organization требуют version; GET /organization и списки клиентов возвращают её. Добавлены businessId, bankName, iban, bic. POST /orders/:id/invoices создаёт INVOICE_DRAFT со снимком и идемпотентным ключом. GET /documents/search принимает kind=ACT_DRAFT|INVOICE_DRAFT. Полный контракт и ограничения: [document-workflow.md](document-workflow.md).
+
+## Аннулирование черновиков
+
+`POST /documents/:id/annul` (OWNER): `version`, `reason` (3–500 Unicode-символов, без управляющих кодов кроме перевода строки/табуляции и без одиночных суррогатов), `idempotencyKey`. Совпадающий повтор — прежний результат; конфликт — 409. `GET /documents/search` дополнительно принимает `status=DRAFT|ANNULLED`. Списки возвращают status/version; полное чтение — причину, автора и время. См. [документооборот](document-workflow.md).

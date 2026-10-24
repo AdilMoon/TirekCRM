@@ -167,7 +167,7 @@ export class CrmService {
   async documents(org: string) {
     const docs = await this.db.client.document.findMany({ where: { organizationId: org }, include: { order: true }, orderBy: { createdAt: 'desc' }, take: 200 });
     return docs.map(doc => { const snapshot = doc.snapshot as unknown as DocumentSnapshot; return {
-      id: doc.id, number: doc.number, kind: doc.kind, orderId: doc.orderId, orderNumber: doc.order.number,
+      id: doc.id, number: doc.number, kind: doc.kind, status:doc.status, version:doc.version, orderId: doc.orderId, orderNumber: doc.order.number,
       clientName: snapshot.client.name, total: snapshot.invoice?.amountDue ?? snapshot.total, createdAt: doc.createdAt,
     }; });
   }

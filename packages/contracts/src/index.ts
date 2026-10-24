@@ -62,7 +62,8 @@ export interface Order {
   createdAt: string; items: { description: string; quantity: number; unitPrice: string; total: string }[];
 }
 export interface Movement { id: string; kind: 'INCOME' | 'EXPENSE'; amount: string; description: string; category: string; orderId?:string|null; orderNumber: number | null; createdAt: string }
-export interface DocumentRecord { id: string; number: number; kind: 'ACT_DRAFT' | 'INVOICE_DRAFT'; orderId: string; orderNumber: number; clientName: string; total: string; createdAt: string }
+export type DocumentStatus='DRAFT'|'ANNULLED';
+export interface DocumentRecord { status:DocumentStatus; version:number; id: string; number: number; kind: 'ACT_DRAFT' | 'INVOICE_DRAFT'; orderId: string; orderNumber: number; clientName: string; total: string; createdAt: string }
 export interface DocumentSnapshot {
   organization: { name: string; address: string; businessId: string; bankName?:string; iban?:string; bic?:string };
   client: Omit<ClientInput,'businessId'|'bankName'|'iban'|'bic'> & Partial<Pick<ClientInput,'businessId'|'bankName'|'iban'|'bic'>>;
@@ -133,7 +134,7 @@ export const movementQuerySchema=listQuerySchema.extend({
  ...periodFields,kind:z.enum(['INCOME','EXPENSE']).optional(),
  category:z.enum(['ORDER_PAYMENT','MATERIALS','LABOR','TRANSPORT','RENT','OTHER']).optional(),
 }).strict().refine(value=>!value.from||!value.to||value.from<=value.to,{message:'Начало периода позже окончания'});
-export const documentQuerySchema=listQuerySchema.extend({...periodFields,kind:z.enum(['ACT_DRAFT','INVOICE_DRAFT']).optional()}).strict()
+export const documentQuerySchema=listQuerySchema.extend({...periodFields,status:z.enum(['DRAFT','ANNULLED']).optional(),kind:z.enum(['ACT_DRAFT','INVOICE_DRAFT']).optional()}).strict()
  .refine(value=>!value.from||!value.to||value.from<=value.to,{message:'Начало периода позже окончания'});
 export type MovementQuery=z.infer<typeof movementQuerySchema>;
 export type DocumentQuery=z.infer<typeof documentQuerySchema>;
@@ -177,3 +178,13 @@ export const invoiceSchema=z.object({
  note:z.string().trim().max(500).refine(value=>!(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value)), 'Недопустимые символы в реквизитах').default(''),
 }).strict();
 export type InvoiceInput=z.infer<typeof invoiceSchema>;
+
+export const annulDocumentSchema=z.object({
+ version:z.number().int().min(1).max(2147483647),idempotencyKey:z.uuid().transform(value=>value.toLowerCase()),
+ reason:z.string().trim().min(3).max(500).refine(value=>!/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f\ud800-\udfff]/u.test(value)),
+}).strict();
+export type AnnulDocumentInput=z.infer<typeof annulDocumentSchema>;
+export interface PrintableDocument {
+ id:string;number:number;createdAt:string;kind:DocumentRecord['kind'];snapshot:DocumentSnapshot;
+ status:DocumentStatus;version:number;annulledAt:string|null;annulledByName:string|null;annulmentReason:string|null;
+}

@@ -28,6 +28,7 @@ model Organization {
   address      String @default("")
   businessId   String @default("")
   auditEvents  AuditEvent[]
+  privacyRequests PrivacyRequest[]
   invitations  Invitation[]
   tasks        BusinessTask[]
   orderSeq     Int @default(0)
@@ -267,4 +268,41 @@ model Notification {
  @@unique([organizationId,recipientId,eventKey])
  @@index([organizationId,recipientId,createdAt,id])
  @@index([organizationId,recipientId,readAt])
+}
+
+model PrivacyRequest {
+ id String @id @default(uuid()) @db.Uuid
+ organizationId String @db.Uuid
+ organization Organization @relation(fields:[organizationId],references:[id],onDelete:Cascade)
+ kind String
+ status String @default("OPEN")
+ subjectName String
+ contact String @default("")
+ description String
+ receivedOn DateTime @db.Date
+ dueOn DateTime? @db.Date
+ resolution String @default("")
+ createdById String @db.Uuid
+ createdByName String
+ creationKey String @db.Uuid
+ changes PrivacyRequestChangeReceipt[]
+ version Int @default(1)
+ closedAt DateTime?
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+ @@unique([organizationId,creationKey])
+ @@unique([id,organizationId])
+ @@index([organizationId,dueOn,createdAt,id])
+}
+
+model PrivacyRequestChangeReceipt {
+ id String @id @default(uuid()) @db.Uuid
+ organizationId String @db.Uuid
+ requestId String @db.Uuid
+ request PrivacyRequest @relation(fields:[requestId,organizationId],references:[id,organizationId],onDelete:Cascade)
+ idempotencyKey String @db.Uuid
+ actorId String @db.Uuid
+ inputHash String @db.VarChar(64)
+ createdAt DateTime @default(now())
+ @@unique([organizationId,idempotencyKey])
 }

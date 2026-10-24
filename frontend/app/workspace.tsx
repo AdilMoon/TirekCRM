@@ -1,4 +1,5 @@
 'use client';
+import {PrivacyRequests} from '../features/privacy-requests';
 import { useI18n, LanguageSwitcher } from '../i18n/provider';
 
 import { useCallback, useEffect, useState } from 'react';
@@ -115,7 +116,7 @@ const navigation = [
       {section === 'history' && <AuditTrail revision={data}/>}
       {section === 'finances' && <FinanceReport revision={data} onOrder={id=>openOrder({id})}/>}
       {section === 'documents' && <DocumentDirectory revision={data}/>}
-      {section === 'settings' && <div className="settings-space"><OrganizationSettings onSaved={async () => { setUser(await api<SessionUser>('/auth/me')); setToast(t("Реквизиты сохранены")); }} /><AccountSecurity onSessionEnded={expired=>{setUser(null);setData(emptyData);setError(expired?'Сессия истекла. Войдите снова':'');}}/></div>}
+      {section === 'settings' && <div className="settings-space"><PrivacyRequests/><OrganizationSettings onSaved={async () => { setUser(await api<SessionUser>('/auth/me')); setToast(t("Реквизиты сохранены")); }} /><AccountSecurity onSessionEnded={expired=>{setUser(null);setData(emptyData);setError(expired?'Сессия истекла. Войдите снова':'');}}/></div>}
 <footer className="page-footer"><span>{t("Tirek · опора вашего бизнеса")}</span><span>{refreshing ? t("Обновляем данные…") : t("Данные вашего рабочего пространства")}</span></footer>
     </main></div>
     {toast && <div className="toast" role="status"><CheckCircle2 size={19} />{t(toast)}</div>}

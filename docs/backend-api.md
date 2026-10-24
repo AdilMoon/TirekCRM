@@ -61,3 +61,7 @@ PATCH /clients/:id и PATCH /organization требуют version; GET /organizat
 ## Аннулирование черновиков
 
 `POST /documents/:id/annul` (OWNER): `version`, `reason` (3–500 Unicode-символов, без управляющих кодов кроме перевода строки/табуляции и без одиночных суррогатов), `idempotencyKey`. Совпадающий повтор — прежний результат; конфликт — 409. `GET /documents/search` дополнительно принимает `status=DRAFT|ANNULLED`. Списки возвращают status/version; полное чтение — причину, автора и время. См. [документооборот](document-workflow.md).
+
+## Обращения по персональным данным
+
+OWNER: GET/POST `/api/privacy-requests`, GET/PATCH `/api/privacy-requests/:id`. Запись проверяет Origin, организацию, активного владельца и строгий контракт. Версии и ключи повторов защищают переходы; закрытие требует результата. Фильтры и подробный контракт — [privacy-requests.md](privacy-requests.md).

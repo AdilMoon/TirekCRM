@@ -86,7 +86,7 @@ export const listQuerySchema = z.object({
 });
 export const orderQuerySchema = listQuerySchema.extend({ status: z.enum(stages).optional() });
 export const auditQuerySchema = listQuerySchema.omit({ q:true }).extend({
-  entityType: z.enum(['ORDER','CLIENT','ORGANIZATION','PAYMENT','EXPENSE','DOCUMENT','TASK','TEAM','ACCOUNT']).optional(),
+  entityType: z.enum(['ORDER','CLIENT','ORGANIZATION','PAYMENT','EXPENSE','DOCUMENT','TASK','TEAM','ACCOUNT','PRIVACY_REQUEST']).optional(),
   entityId: z.uuid().optional(),
 });
 export const updateOrderSchema = orderSchema.extend({ version:z.number().int().min(1) });
@@ -188,3 +188,28 @@ export interface PrintableDocument {
  id:string;number:number;createdAt:string;kind:DocumentRecord['kind'];snapshot:DocumentSnapshot;
  status:DocumentStatus;version:number;annulledAt:string|null;annulledByName:string|null;annulmentReason:string|null;
 }
+
+export const privacyRequestKinds=['ACCESS','CORRECTION','DELETION','WITHDRAWAL','OTHER'] as const;
+export type PrivacyRequestKind=typeof privacyRequestKinds[number];
+export const privacyRequestStatuses=['OPEN','IN_PROGRESS','RESOLVED','REJECTED'] as const;
+export type PrivacyRequestStatus=typeof privacyRequestStatuses[number];
+export const privacyKindLabels:Record<PrivacyRequestKind,string>={ACCESS:'Доступ к данным',CORRECTION:'Исправление данных',DELETION:'Удаление данных',WITHDRAWAL:'Отзыв согласия',OTHER:'Другое обращение'};
+export const privacyStatusLabels:Record<PrivacyRequestStatus,string>={OPEN:'Получено',IN_PROGRESS:'В обработке',RESOLVED:'Исполнено',REJECTED:'Отказ с обоснованием'};
+const privacyText=(max:number,min=0)=>z.string().trim().min(min).max(max).refine(value=>!/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f\ud800-\udfff]/u.test(value));
+const privacyDate=z.iso.date().refine(value=>value>='1900-01-01');
+export const privacyRequestSchema=z.object({
+ kind:z.enum(privacyRequestKinds),subjectName:privacyText(160,1),contact:privacyText(200).default(''),description:privacyText(1000,3),
+ receivedOn:privacyDate,dueOn:privacyDate.nullable().default(null),idempotencyKey:z.uuid().transform(v=>v.toLowerCase()),
+}).strict().refine(v=>!v.dueOn||v.dueOn>=v.receivedOn,{message:'Срок не может быть раньше даты получения'});
+export const privacyRequestChangeSchema=z.object({
+ version:z.number().int().min(1).max(2147483646),status:z.enum(['IN_PROGRESS','RESOLVED','REJECTED']),
+ resolution:privacyText(1000).default(''),idempotencyKey:z.uuid().transform(v=>v.toLowerCase()),
+}).strict().refine(v=>v.status==='IN_PROGRESS'?v.resolution==='':[...v.resolution].length>=3,{message:'Укажите результат или основание отказа'});
+export const privacyRequestQuerySchema=listQuerySchema.extend({q:privacyText(200).default(''),status:z.enum(privacyRequestStatuses).optional(),overdue:z.enum(['true','false']).default('false')}).strict();
+export type PrivacyRequestInput=z.infer<typeof privacyRequestSchema>;
+export type PrivacyRequestChange=z.infer<typeof privacyRequestChangeSchema>;
+export type PrivacyRequestQuery=z.infer<typeof privacyRequestQuerySchema>;
+export interface PrivacyRequestSummary {
+ id:string;kind:PrivacyRequestKind;status:PrivacyRequestStatus;subjectName:string;receivedOn:string;dueOn:string|null;version:number;createdAt:string;overdue:boolean;
+}
+export interface PrivacyRequestDetail extends PrivacyRequestSummary {contact:string;description:string;resolution:string;createdByName:string;closedAt:string|null;updatedAt:string}

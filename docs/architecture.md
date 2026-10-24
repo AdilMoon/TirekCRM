@@ -57,3 +57,5 @@
 Обсуждения задач находятся в backend/src/modules/tasks/task-comments.service.ts и frontend/features/task-discussion.tsx. Таблица TaskComment связана с задачей и автором составными ключами организации; правила доступа и идемпотентности — в [task-discussions.md](task-discussions.md).
 
 Центр уведомлений — frontend/features/notifications.tsx, подключён к обеим рабочим областям. NotificationWriter — функция с явным TransactionClient, поэтому публикация не создаёт вложенную транзакцию и не требует циклического импорта модулей. Описание — [notifications.md](notifications.md).
+
+Адаптивная навигация владельца выделена в frontend/components/workspace-navigation.tsx; мобильные переопределения стилей — frontend/app/mobile.css. Подробности — [мобильное рабочее пространство](mobile-workspace.md).

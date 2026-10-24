@@ -1,7 +1,7 @@
 'use client';
 import { useI18n, LanguageSwitcher } from '../i18n/provider';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ArrowDownLeft, ArrowUpRight, ArrowRight, CalendarDays, ChevronRight, CircleHelp, FileText, LayoutDashboard, LogOut, Menu, Plus, Users, Wallet, BriefcaseBusiness, LoaderCircle, CheckCircle2, Clock3, Settings2, History } from 'lucide-react';
 import { type SessionUser, type Client, type Order, type Dashboard } from '@tirek/contracts';
 import { api } from '../lib/api';
@@ -10,6 +10,7 @@ const emptyData = { clients: [] as Client[], orders: [] as Order[], dashboard: n
 import { NotificationCenter } from '../features/notifications';
 import { GettingStarted } from '../features/getting-started';
 import { Brand, Stat, Empty } from '../components/ui';
+import { WorkspaceNavigation } from '../components/workspace-navigation';
 import { Team } from '../features/team';
 import { Tasks } from '../features/tasks';
 import { EmployeeWorkspace } from '../features/employee-workspace';
@@ -45,6 +46,7 @@ const navigation = [
 
   const [refreshing, setRefreshing] = useState(false);
   const [mobileMenu, setMobileMenu] = useState(false);
+  const closeMobileMenu = useCallback(() => setMobileMenu(false), []);
   async function refresh() {
     setRefreshing(true);
     try {
@@ -79,15 +81,15 @@ const navigation = [
   const selectedNav = navigation.find(n => n.id === section)!;
   const day = formatDate(new Date(), { day: 'numeric', month: 'long', weekday: 'long', timeZone: 'Asia/Almaty' });
   return <div className="app-shell">
-    <aside className={`sidebar ${mobileMenu ? 'is-open' : ''}`}>
+    <WorkspaceNavigation open={mobileMenu} onClose={closeMobileMenu}>
       <Brand />
       <div className="workspace-label"><span className="workspace-avatar">{user.organization.name.split(/\s+/).slice(0,2).map(word => word[0]).join("")}</span><div><strong>{user.organization.name}</strong><span>{t("Рабочее пространство")}</span></div></div>
       <p className="nav-caption">{t("УПРАВЛЕНИЕ БИЗНЕСОМ")}</p>
       <nav aria-label={t("Основная навигация")}>{navigation.map(({ id, label, icon: Icon }) => <button key={id} className={`nav-item ${section === id ? 'active' : ''}`} aria-current={section === id ? 'page' : undefined} onClick={() => navigate(id)}><Icon size={19} strokeWidth={1.7} /><span>{label}</span>{id === 'orders' && !!dashboard?.activeOrders && <small>{dashboard.activeOrders}</small>}</button>)}</nav>
-      <div className="sidebar-bottom"><div className="local-note"><span className="live-dot" /><div><strong>{t("Первый шаг к порядку")}</strong><p>{t("Клиенты, работа и деньги.")}<br />{t("Всё связано между собой.")}</p></div></div><button className="help-button" onClick={() => setModal({ kind: 'about' })}><CircleHelp size={18} />  {t("О проекте")} <ArrowUpRight size={15} /></button>
+      <div className="sidebar-bottom"><div className="local-note"><span className="live-dot" /><div><strong>{t("Первый шаг к порядку")}</strong><p>{t("Клиенты, работа и деньги.")}<br />{t("Всё связано между собой.")}</p></div></div><button className="help-button" onClick={() => { closeMobileMenu(); setModal({ kind: 'about' }); }}><CircleHelp size={18} />  {t("О проекте")} <ArrowUpRight size={15} /></button>
       <div className="profile"><span className="user-avatar">{t("В")}</span><div><strong>{user.name}</strong><span>{t("Владелец компании")}</span></div><button aria-label={t("Выйти")} className="icon-button" onClick={async () => { try { await api('/auth/logout', { method: 'POST' }); setUser(null); setData(emptyData); } catch (e) { setError((e as Error).message); } }}><LogOut size={17} /></button></div></div>
-    </aside>
-    <div className="main-shell"><header className="topbar"><div className="breadcrumb"><button className="icon-button mobile-menu" aria-label={t("Меню")} onClick={() => setMobileMenu(!mobileMenu)}><Menu size={22} /></button><span>{t("Рабочее пространство")}</span><ChevronRight size={14} /><strong>{selectedNav.label}</strong></div><div className="topbar-right"><NotificationCenter key={user.id} userId={user.id} onSessionExpired={()=>{setUser(null);setData(emptyData);}}/><LanguageSwitcher /><span className="demo-pill">{user.organization.currency}</span><span className="top-date"><CalendarDays size={16} />{formatDate(new Date(), { day: 'numeric', month: 'short', timeZone: 'Asia/Almaty' })}</span></div></header>
+    </WorkspaceNavigation>
+    <div className="main-shell"><header className="topbar"><div className="breadcrumb"><button className="icon-button mobile-menu" aria-label={t("Меню")} aria-expanded={mobileMenu} aria-haspopup="dialog" aria-controls={mobileMenu ? "workspace-navigation" : undefined} onClick={() => setMobileMenu(!mobileMenu)}><Menu size={22} /></button><span>{t("Рабочее пространство")}</span><ChevronRight size={14} /><strong>{selectedNav.label}</strong></div><div className="topbar-right"><NotificationCenter key={user.id} userId={user.id} onSessionExpired={()=>{setUser(null);setData(emptyData);}}/><LanguageSwitcher /><span className="demo-pill">{user.organization.currency}</span><span className="top-date"><CalendarDays size={16} />{formatDate(new Date(), { day: 'numeric', month: 'short', timeZone: 'Asia/Almaty' })}</span></div></header>
     <main>
       {error && <div className="alert" role="alert">{t(error)}<button onClick={() => refresh().catch(e => setError(e.message))}>{t("Обновить")}</button></div>}
       <div className="page-heading"><div><p className="eyebrow">{section === 'overview' ? day : t("{0} / РАБОЧЕЕ ПРОСТРАНСТВО", user.organization.name)}</p><h1>{section === 'overview' ? t("Всё под контролем.") : selectedNav.label}</h1><p className="page-subtitle">{({ overview: t("Ваш бизнес в деталях. Главное — на одном экране."), clients: t("Люди и компании, с которыми вы работаете."), orders: t("От первого обращения до выполненной работы."), finances: t("Поступления и расходы без потерянных деталей."), documents: t("Документы, связанные с вашими заказами."), tasks:t('Договорённости, исполнители и сроки в одном месте.'),team:t('Люди, с которыми вы строите бизнес.'),history:t('Кто и когда изменил данные'), settings:t("Данные компании для вашего пространства и документов.") })[section]}</p></div>

@@ -15,10 +15,10 @@ export function ClientDirectory({revision,onSelect}:{revision:unknown;onSelect:(
  return <section className="panel" aria-busy={busy}><div className="table-toolbar"><h2>{t('Клиентская база')}</h2>
   <SearchBox value={q} setValue={value=>{setQ(value);setPage(1);}} placeholder={t('Имя, компания или телефон')} /></div>
   {error&&<div className="alert" role="alert">{t(error)}<button onClick={retry}>{t('Обновить')}</button></div>}
-  <div className="table-wrap"><table><thead><tr><th>{t('Клиент')}</th><th>{t('Контакты')}</th><th>{t('Адрес')}</th><th>{t('Заказы')}</th><th>{t('Добавлен')}</th></tr></thead>
+  <div className="table-wrap"><table className="clients-table"><thead><tr><th>{t('Клиент')}</th><th>{t('Контакты')}</th><th>{t('Адрес')}</th><th>{t('Заказы')}</th><th>{t('Добавлен')}</th></tr></thead>
   <tbody>{result?.items.map(c=><tr key={c.id}><td><div className="client-cell"><span className="client-avatar">{c.name.slice(0,1)}</span><div>
    <button className="text-button" onClick={()=>onSelect(c)}><strong>{c.name}</strong><Pencil size={13}/></button><small>{c.company||t('Частный клиент')}</small>
-  </div></div></td><td>{c.phone||t('Телефон не указан')}<small className="cell-sub">{c.email}</small></td><td>{c.address||'—'}</td><td>{c.ordersCount}</td><td>{dateLabel(c.createdAt)}</td></tr>)}</tbody></table></div>
+  </div></div></td><td data-label={t('Контакты')}>{c.phone||t('Телефон не указан')}<small className="cell-sub">{c.email}</small></td><td data-label={t('Адрес')}>{c.address||'—'}</td><td data-label={t('Заказы')}>{c.ordersCount}</td><td data-label={t('Добавлен')}>{dateLabel(c.createdAt)}</td></tr>)}</tbody></table></div>
   {!busy&&!error&&!result?.items.length&&<Empty>{t('Ничего не найдено')}</Empty>}
   <Pagination result={result} page={page} setPage={setPage} busy={busy}/>
  </section>;

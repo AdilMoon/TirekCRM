@@ -61,7 +61,8 @@ test('owner creates a company in three languages and starts with a clean workspa
  await expect(page.getByRole('heading',{name:'Team',exact:true})).toBeVisible();
  await page.getByRole('button',{name:'Menu',exact:true}).click();
  await page.getByRole('button',{name:'Overview',exact:true}).click();
- await expect(page.locator('.sidebar')).not.toHaveClass(/is-open/);
+ await expect(page.getByRole('dialog')).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'Menu',exact:true})).toHaveAttribute('aria-expanded','false');
  await page.screenshot({path:'test-results/getting-started-mobile.png',fullPage:true,animations:'disabled'});
  await page.setViewportSize({width:1280,height:900});
  await setup.screenshot({path:'test-results/getting-started-desktop.png',animations:'disabled'});

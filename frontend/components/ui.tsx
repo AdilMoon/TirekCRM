@@ -16,13 +16,20 @@ export function Empty({ children }: { children: ReactNode }) {
 
  return <div className="empty"><BriefcaseBusiness size={28} /><p>{children}</p></div>; }
 
-export function ModalShell({ children, title, onClose, busy = false }: { children: ReactNode; title: string; onClose: () => void; busy?: boolean }) {
+export function ModalShell({ children, title, onClose, busy = false, className = '', id }: { children: ReactNode; title: string; onClose: () => void; busy?: boolean; className?: string; id?: string }) {
   const { t } = useI18n();
 
   const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => { ref.current?.showModal(); const old = document.body.style.overflow; document.body.style.overflow = 'hidden'; return () => { document.body.style.overflow = old; }; }, []);
-  return <dialog ref={ref} className="modal" aria-label={title} onCancel={e => { e.preventDefault(); if (!busy) onClose(); }} onClick={e => { if (e.target === e.currentTarget && !busy) onClose(); }}>
-    <div className="modal-inner"><div className="modal-head"><h2>{title}</h2><button className="icon-button" aria-label={t("Закрыть")} disabled={busy} onClick={onClose}><X size={20} /></button></div>{children}</div>
+  useEffect(() => {
+    const dialog = ref.current;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    dialog?.showModal();
+    const old = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { dialog?.close(); document.body.style.overflow = old; if(previousFocus?.isConnected)previousFocus.focus({preventScroll:true}); };
+  }, []);
+  return <dialog ref={ref} id={id} className={`modal ${className}`} aria-label={title} onCancel={e => { e.preventDefault(); if (!busy) onClose(); }} onClick={e => { if (e.target === e.currentTarget && !busy) onClose(); }}>
+    <div className="modal-inner"><div className="modal-head"><h2>{title}</h2><button className="icon-button" autoFocus aria-label={t("Закрыть")} disabled={busy} onClick={onClose}><X size={20} /></button></div>{children}</div>
   </dialog>;
 }
 

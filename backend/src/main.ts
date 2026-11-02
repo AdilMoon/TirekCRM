@@ -9,7 +9,9 @@ import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import { AppModule } from './app.module';
 import { ApiErrors } from './common/api-errors.filter';
+import { webOrigin } from './common/web-origin';
 async function bootstrap() {
+  webOrigin(); // Fail at startup instead of issuing cookies with invalid configuration.
   if (process.env.NODE_ENV === 'production' && process.env.DEMO_SEED === 'true') throw new Error('Demo configuration must not run in production');
   const app = await NestFactory.create<NestFastifyApplication>(AppModule, new FastifyAdapter({ bodyLimit: 512 * 1024, trustProxy: false }));
   // Never let browsers or shared proxies retain tenant/session API responses,

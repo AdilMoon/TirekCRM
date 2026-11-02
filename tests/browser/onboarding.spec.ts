@@ -13,7 +13,7 @@ test.afterAll(async()=>{
  await db.organization.deleteMany({where:{id:{in:ids}}});
  await db.$disconnect();
 });
-test('owner creates a company in three languages and starts with a clean workspace on mobile',async({page,context})=>{
+test('owner creates a company in three languages and starts with a clean workspace on mobile',async({page,context,baseURL})=>{
  test.setTimeout(60000);
  const email=randomUUID()+'@onboarding-browser.invalid',name=prefix+' '+'Қ'.repeat(90);
  await page.setViewportSize({width:390,height:844});
@@ -47,6 +47,10 @@ test('owner creates a company in three languages and starts with a clean workspa
  await expect(setup).toBeVisible();
  await expect(page.getByText('Demo workspace',{exact:true})).toHaveCount(0);
  expect((await context.cookies()).find(c=>c.name==='tirek_session')?.httpOnly).toBe(true);
+ if(baseURL?.startsWith('https://')){
+  expect((await context.cookies()).find(c=>c.name==='tirek_session')?.secure).toBe(true);
+  expect(await page.evaluate(()=>window.isSecureContext)).toBe(true);
+ }
  const user=await db.user.findUniqueOrThrow({where:{email},include:{organization:true}});
  expect(user.role).toBe('OWNER');expect(user.organization.name).toBe(name);
  expect(await db.client.count({where:{organizationId:user.organizationId}})).toBe(0);
@@ -80,7 +84,7 @@ test('owner creates a company in three languages and starts with a clean workspa
  await expect(page.locator('form')).toHaveCount(0);
 });
 
-test('a lost registration response can be recovered by signing in without creating another company',async({page})=>{
+test('a lost registration response can be recovered by signing in without creating another company',async({page,baseURL})=>{
  test.setTimeout(60000);
  const email=randomUUID()+'@onboarding-browser.invalid',name=prefix+' Lost response';
  await page.goto('/register');
@@ -91,8 +95,8 @@ test('a lost registration response can be recovered by signing in without creati
  await page.getByLabel('Повторите пароль',{exact:true}).fill(password);
  await page.route('**/api/onboarding/register',async route=>{
   // Perform the real transaction outside the browser cookie jar, then lose its HTTP response.
-  const response=await fetch((process.env.TEST_API_URL??'http://127.0.0.1:4000/api')+'/onboarding/register',{
-   method:'POST',headers:{Origin:process.env.WEB_ORIGIN??'http://localhost:3000','Content-Type':'application/json'},body:route.request().postData()!,
+  const response=await fetch(route.request().url(),{
+   method:'POST',headers:{Origin:new URL(baseURL??'http://localhost:3000').origin,'Content-Type':'application/json'},body:route.request().postData()!,
   });
   expect(response.status).toBe(201);await route.abort('failed');
  });

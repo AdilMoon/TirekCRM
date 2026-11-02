@@ -1,0 +1,28 @@
+{
+	admin off
+	persist_config off
+	auto_https disable_redirects
+	skip_install_trust
+	default_bind 127.0.0.1 ::1
+	storage file_system {
+		root .local/caddy
+	}
+	pki {
+		ca local {
+			name "TirekCRM Local Development CA"
+		}
+	}
+}
+
+https://localhost:8443 {
+	tls internal
+	# Keep API routing and WebSocket upgrades in the existing Next.js proxy.
+	reverse_proxy 127.0.0.1:3000
+	# HSTS is deliberately absent locally: it would also upgrade HTTP on port 3000.
+	header -Strict-Transport-Security
+}
+
+http://localhost:8080 {
+	# Never build the redirect from a client-controlled Host header.
+	redir https://localhost:8443{uri} 308
+}

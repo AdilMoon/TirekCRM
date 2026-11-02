@@ -4,22 +4,25 @@ CRM для малого бизнеса Казахстана. Рабочая ло
 Приватный GitHub: [AdilMoon/TirekCRM](https://github.com/AdilMoon/TirekCRM). Порядок коммитов и проверок — в [git-workflow.md](docs/git-workflow.md).
 
 ## Быстрый старт
-Откройте терминал в **D:\Projects\TirekCRM**. На новом компьютере:
+Откройте терминал в корне своей копии **TirekCRM**. На новом компьютере с Windows:
 ```sh
 npm ci
 npm run setup
+npm run https:setup
+certutil.exe -user -addstore Root .local/caddy/pki/authorities/local/root.crt
 npm run db:local
 ```
 Оставьте базу запущенной. Во втором терминале:
 ```sh
 npm run db:migrate
 npm run db:seed
-npm run dev
+npm run dev:https
 ```
-Сайт: http://localhost:3000. Демо-вход: owner@tirek.local; начальный пароль TirekDemo2026! (см. .env).
+Сайт: https://localhost:8443. [Локальный TLS, доверие сертификату и проверки](docs/https.md).
+Демо-вход после seed: owner@tirek.local; начальный пароль TirekDemo2026! (см. .env).
 На текущем компьютере база и зависимости уже настроены. Seed не очищает данные.
 
-Можно также создать пустую компанию через [форму регистрации](http://localhost:3000/register). В production она по умолчанию закрыта; конфигурация и ограничения описаны в [company-onboarding.md](docs/company-onboarding.md).
+Можно также создать пустую компанию через [форму регистрации](https://localhost:8443/register). В production она по умолчанию закрыта; конфигурация и ограничения описаны в [company-onboarding.md](docs/company-onboarding.md).
 
 ## Структура
 ```text

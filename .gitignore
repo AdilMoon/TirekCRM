@@ -10,3 +10,8 @@ playwright-report/
 test-results/
 *.log
 *.tsbuildinfo
+# TLS private material must never be committed, even outside .local/.
+*.key
+*.pem
+*.pfx
+*.p12

@@ -4,7 +4,7 @@ const command = process.argv[2] ?? 'dev';
 if (!['dev','build','start'].includes(command)) throw new Error('Unknown Next.js command');
 const cli = fileURLToPath(new URL('../node_modules/next/dist/bin/next', import.meta.url));
 const flags = ['--preserve-symlinks', '--preserve-symlinks-main'];
-const args = command === 'build' ? ['build','--webpack'] : [command,...(command === 'dev' ? ['--webpack'] : []),'--hostname','127.0.0.1'];
+const args = command === 'build' ? ['build','--webpack'] : [command,...(command === 'dev' ? ['--webpack'] : []),'--hostname','127.0.0.1','--port',process.env.PORT ?? '3000'];
 const child = spawn(process.execPath, [...flags, cli, ...args], {
   stdio:'inherit', windowsHide:true,
   env:{ ...process.env, NEXT_TELEMETRY_DISABLED:'1', NODE_OPTIONS:`${process.env.NODE_OPTIONS ?? ''} ${flags.join(' ')}`.trim() },

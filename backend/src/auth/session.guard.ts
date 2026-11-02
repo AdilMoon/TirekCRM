@@ -4,6 +4,7 @@ import { createHash, randomBytes, scrypt as scryptCallback, timingSafeEqual } fr
 import { promisify } from 'node:util';
 import type { FastifyRequest } from 'fastify';
 import { Database } from '../database/database.service';
+import { allowedWebOrigins } from '../common/web-origin';
 
 const scrypt = promisify(scryptCallback);
 export async function hashPassword(password: string) {
@@ -29,8 +30,7 @@ export class SessionGuard implements CanActivate {
     const req = context.switchToHttp().getRequest<AuthRequest>();
     const path = req.url.split('?')[0];
     if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
-      const allowed = new Set([process.env.WEB_ORIGIN ?? 'http://localhost:3000']);
-      if (process.env.NODE_ENV !== 'production') allowed.add('http://127.0.0.1:3000');
+      const allowed = allowedWebOrigins();
       if (!req.headers.origin || !allowed.has(req.headers.origin)) throw new ForbiddenException('Недопустимый источник запроса');
     }
     if (this.reflector.getAllAndOverride<boolean>('publicAccess',[context.getHandler(),context.getClass()]) || path === '/api/health' || path === '/api/auth/login') return true;

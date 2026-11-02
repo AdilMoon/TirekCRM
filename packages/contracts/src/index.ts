@@ -130,10 +130,16 @@ export interface BusinessTask {
 
 const reportDate=z.iso.date().refine(value=>value>='0001-01-01');
 const periodFields={from:reportDate.optional(),to:reportDate.optional(),orderId:z.uuid().optional()};
-export const movementQuerySchema=listQuerySchema.extend({
+const movementFilterFields={
  ...periodFields,kind:z.enum(['INCOME','EXPENSE','REFUND','EXPENSE_REVERSAL']).optional(),
  category:z.enum(['ORDER_PAYMENT','ORDER_REFUND','MATERIALS','LABOR','TRANSPORT','RENT','OTHER']).optional(),
-}).strict().refine(value=>!value.from||!value.to||value.from<=value.to,{message:'Начало периода позже окончания'});
+};
+const validReportPeriod=(value:{from?:string;to?:string})=>!value.from||!value.to||value.from<=value.to;
+export const movementQuerySchema=listQuerySchema.extend(movementFilterFields).strict()
+ .refine(validReportPeriod,{message:'Начало периода позже окончания'});
+export const movementExportQuerySchema=listQuerySchema.omit({page:true,pageSize:true}).extend(movementFilterFields).strict()
+ .refine(validReportPeriod,{message:'Начало периода позже окончания'});
+export type MovementExportQuery=z.infer<typeof movementExportQuerySchema>;
 export const documentQuerySchema=listQuerySchema.extend({...periodFields,status:z.enum(['DRAFT','ANNULLED']).optional(),kind:z.enum(['ACT_DRAFT','INVOICE_DRAFT']).optional()}).strict()
  .refine(value=>!value.from||!value.to||value.from<=value.to,{message:'Начало периода позже окончания'});
 export type MovementQuery=z.infer<typeof movementQuerySchema>;

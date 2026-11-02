@@ -50,7 +50,7 @@ TirekCRM/
 - [Обсуждения задач](docs/task-discussions.md)
 - [Личные уведомления](docs/notifications.md)
 - [Реквизиты и счета на оплату](docs/document-workflow.md)
-- [Финансовые отчёты и документы](docs/financial-reports.md)
+- [Финансовые отчёты, CSV-экспорт и документы](docs/financial-reports.md)
 - [Создание компании и первые шаги](docs/company-onboarding.md)
 - [Безопасность аккаунта и сеансы](docs/account-security.md)
 - [Правила локализации](docs/localization.md)

@@ -225,7 +225,22 @@ export const expenseReversalSchema=z.object({reason:adjustmentReason,idempotency
 export const refundSchema=expenseReversalSchema.extend({amount:moneySchema}).strict();
 export type RefundInput=z.infer<typeof refundSchema>;
 export type ExpenseReversalInput=z.infer<typeof expenseReversalSchema>;
+export const expenseReplacementSchema=expenseReversalSchema.extend({
+ amount:moneySchema,
+ description:z.string().trim().min(1).max(200).refine(value=>!/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f\ud800-\udfff]/u.test(value)),
+ category:expenseSchema.shape.category,
+ // Explicit null unlinks the order; omission must never silently discard a link.
+ orderId:z.uuid().transform(value=>value.toLowerCase()).nullable(),
+}).strict();
+export type ExpenseReplacementInput=z.infer<typeof expenseReplacementSchema>;
+export interface ExpenseReplacementResult {
+ originalExpenseId:string;
+ reversal:{id:string;amount:string;reason:string;actorName:string;createdAt:string};
+ expense:{id:string;amount:string;description:string;category:string;orderId:string|null;createdAt:string};
+}
 export interface FinancialOperation {
  id:string;kind:'INCOME'|'EXPENSE';amount:string;remaining:string;description:string;createdAt:string;
  corrections:{id:string;amount:string;reason:string;actorName:string;createdAt:string}[];
+ replacementExpenseId?:string|null;replacesExpenseId?:string|null;
+ category?:string;orderId?:string|null;
 }

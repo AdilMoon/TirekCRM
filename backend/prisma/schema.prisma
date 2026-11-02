@@ -152,6 +152,7 @@ model Expense {
   idempotencyKey String @db.Uuid
   createdAt      DateTime @default(now())
   reversal ExpenseReversal?
+  replaces ExpenseReversal? @relation("ExpenseReplacement")
   @@unique([id, organizationId])
   @@unique([organizationId, idempotencyKey])
   @@index([organizationId, createdAt])
@@ -331,6 +332,8 @@ model ExpenseReversal {
  organizationId String @db.Uuid
  expenseId String @db.Uuid
  expense Expense @relation(fields:[expenseId,organizationId],references:[id,organizationId],onDelete:Cascade)
+ replacementExpenseId String? @db.Uuid
+ replacementExpense Expense? @relation("ExpenseReplacement",fields:[replacementExpenseId,organizationId],references:[id,organizationId],onDelete:Restrict,onUpdate:Cascade)
  amount Decimal @db.Decimal(18,2)
  reason String
  actorId String @db.Uuid
@@ -338,6 +341,7 @@ model ExpenseReversal {
  idempotencyKey String @db.Uuid
  createdAt DateTime @default(now())
  @@unique([expenseId,organizationId])
+ @@unique([replacementExpenseId,organizationId])
  @@unique([organizationId,idempotencyKey])
  @@index([organizationId,createdAt,id])
 }

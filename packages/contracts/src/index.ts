@@ -149,6 +149,13 @@ export interface MovementPage extends PageResult<Movement> {summary:{received:st
 export const passwordChangeSchema=z.object({
  currentPassword:z.string().min(1).max(128),newPassword:z.string().min(12).max(128),
 }).strict();
+export const passwordResetRequestSchema=z.object({email:z.string().trim().toLowerCase().pipe(z.email().max(254))}).strict();
+export const passwordResetConfirmSchema=z.object({
+ token:z.string().regex(/^[a-f0-9]{64}$/i).transform(value=>value.toLowerCase()),
+ newPassword:passwordChangeSchema.shape.newPassword,
+}).strict();
+export type PasswordResetRequest=z.infer<typeof passwordResetRequestSchema>;
+export type PasswordResetConfirm=z.infer<typeof passwordResetConfirmSchema>;
 export interface AccountSession {id:string;createdAt:string|null;expiresAt:string;userAgent:string;current:boolean}
 
 const registrationName=(max:number)=>z.string().trim().min(1).max(max).refine(value=>!/[\u0000-\u001f\u007f]/.test(value));

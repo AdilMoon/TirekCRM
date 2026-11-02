@@ -58,6 +58,8 @@ model User {
   organizationId String @db.Uuid
   organization   Organization @relation(fields: [organizationId], references: [id])
   sessions       Session[]
+  passwordReset  PasswordReset?
+  mailMessages MailMessage[]
   @@unique([id, organizationId])
 }
 model Session {
@@ -70,6 +72,37 @@ model Session {
   expiresAt DateTime
   @@index([expiresAt])
   @@index([userId, expiresAt])
+}
+model PasswordReset {
+  userId String @id @db.Uuid
+  user User @relation(fields:[userId],references:[id],onDelete:Cascade,onUpdate:Cascade)
+  tokenHash String @unique @db.VarChar(64)
+  credentialHash String @db.VarChar(64)
+  requestedAt DateTime @default(now())
+  expiresAt DateTime
+  @@index([expiresAt])
+}
+model MailMessage {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  organizationId String @db.Uuid
+  user User @relation(fields:[userId,organizationId],references:[id,organizationId],onDelete:Cascade,onUpdate:Cascade)
+  recipient String @db.VarChar(254)
+  kind String @db.VarChar(32)
+  eventKey String @db.VarChar(160)
+  deliveryMode String @db.VarChar(16)
+  payload String?
+  expiresAt DateTime?
+  status String @default("PENDING") @db.VarChar(16)
+  attempts Int @default(0)
+  nextAttemptAt DateTime @default(now())
+  leaseToken String? @db.Uuid
+  leaseUntil DateTime?
+  lastErrorCode String? @db.VarChar(32)
+  createdAt DateTime @default(now())
+  sentAt DateTime?
+  @@unique([organizationId,eventKey])
+  @@index([deliveryMode,status,nextAttemptAt,createdAt])
 }
 model Client {
   id             String @id @default(uuid()) @db.Uuid

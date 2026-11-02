@@ -8,6 +8,7 @@
 | backend/src/app.module.ts | Подключение модулей авторизации, CRM, команды, задач и базы |
 | backend/src/modules/crm | HTTP-контроллер, SearchService и бизнес-операции CRM |
 | backend/src/auth | AuthModule/AuthService: вход/выход, смена пароля, отзыв сеансов; SessionGuard и Origin |
+| backend/src/modules/mail | Транзакционная очередь уведомлений аккаунта, локальный/Gmail транспорт, обработчик доставки |
 | backend/src/modules/onboarding | Атомарная регистрация компании/владельца и политика доступности |
 | backend/src/modules/team | Приглашения, сотрудники и управление доступом |
 | backend/src/modules/documents | Счета, аннулирование черновиков, идемпотентность и снимки реквизитов; акты используют общий сборщик реквизитов |

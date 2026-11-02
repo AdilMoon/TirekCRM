@@ -11,7 +11,7 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
     "db:seed": "node --env-file=../.env dist/seed.js",
-    "test": "npm run build && node --test dist/common/money.test.js dist/auth/password.test.js dist/common/api-errors.test.js dist/common/web-origin.test.js dist/modules/reports/movement-export.test.js dist/modules/finance/expense-replacement.test.js"
+    "test": "npm run build && node --test dist/common/money.test.js dist/auth/password.test.js dist/common/api-errors.test.js dist/common/web-origin.test.js dist/modules/reports/movement-export.test.js dist/modules/finance/expense-replacement.test.js dist/auth/password-reset.test.js dist/modules/mail/mail.test.js"
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.2",
@@ -25,12 +25,14 @@
     "@prisma/client": "7.10.1",
     "@tirek/contracts": "0.1.0",
     "dotenv": "^17.2.3",
+    "nodemailer": "^10.3.1",
     "pg": "^8.16.3",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2"
   },
   "devDependencies": {
     "@types/node": "^22.18.0",
+    "@types/nodemailer": "^8.0.2",
     "@types/pg": "^8.15.5",
     "prisma": "7.10.1"
   }

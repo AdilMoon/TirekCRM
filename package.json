@@ -21,6 +21,7 @@
     "dev:https": "node scripts/https.mjs",
     "https:setup": "node scripts/setup-https.mjs",
     "test:https": "node --test tests/https.test.mjs",
+    "mail:test": "node --env-file=.env scripts/test-mail.mjs",
     "typecheck": "npm run build -w @tirek/contracts && npm run typecheck -w @tirek/api && npm run typecheck -w @tirek/web",
     "test": "npm run build -w @tirek/contracts && npm run test -w @tirek/api && npm run test:i18n",
     "test:integration": "node --test --test-concurrency=1 tests/*.integration.mjs",

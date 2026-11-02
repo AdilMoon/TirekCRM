@@ -6,10 +6,11 @@ import { createSession } from '../../auth/session';
 import { AuditService } from '../audit/audit.service';
 import { serializable } from '../../common/transaction';
 import { registrationEnabled } from './registration-config';
+import { MailQueue } from '../mail/mail-queue';
 
 @Injectable()
 export class OnboardingService {
- constructor(private readonly db:Database,private readonly audit:AuditService){}
+ constructor(private readonly db:Database,private readonly audit:AuditService,private readonly mail:MailQueue=new MailQueue()){}
  async register(input:RegistrationInput,userAgent:string,existingTokenHash?:string){
   if(!registrationEnabled())throw new ForbiddenException('Создание компаний сейчас недоступно');
   const passwordHash=await hashPassword(input.password);
@@ -24,6 +25,7 @@ export class OnboardingService {
    const owner=await tx.user.create({data:{organizationId:organization.id,name:input.ownerName,email:input.email,passwordHash,role:'OWNER'}});
    const session=await createSession(tx,owner.id,userAgent);
    await this.audit.record(tx,owner,'ORGANIZATION',organization.id,'ORGANIZATION_CREATED');
+   await this.mail.enqueue(tx,owner,'WELCOME','welcome:'+owner.id);
    return session;
   });
  }

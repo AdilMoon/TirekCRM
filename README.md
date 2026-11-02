@@ -53,6 +53,7 @@ TirekCRM/
 - [Финансовые отчёты, CSV-экспорт и документы](docs/financial-reports.md)
 - [Создание компании и первые шаги](docs/company-onboarding.md)
 - [Безопасность аккаунта и сеансы](docs/account-security.md)
+- [Gmail, письма аккаунта и API восстановления доступа](docs/account-mail.md)
 - [Правила локализации](docs/localization.md)
 - [План выхода к пилоту](docs/roadmap.md)
 - [Изменения](docs/changelog.md)

@@ -6,13 +6,14 @@ import { AuditService,Actor } from '../modules/audit/audit.service';
 import { serializable } from '../common/transaction';
 import { createSession } from './session';
 import { hashPassword,verifyPassword } from './session.guard';
+import { MailQueue } from '../modules/mail/mail-queue';
 
 const sessionSelect={id:true,tokenHash:true,createdAt:true,expiresAt:true,userAgent:true} as const;
 export const cleanUserAgent=(value:string|undefined)=>(value??'').replace(/[\u0000-\u001f\u007f]/g,'').slice(0,300);
 @Injectable()
 export class AuthService {
  private readonly dummyHash=hashPassword(randomBytes(32).toString('hex'));
- constructor(private readonly db:Database,private readonly audit:AuditService){}
+ constructor(private readonly db:Database,private readonly audit:AuditService,private readonly mail:MailQueue=new MailQueue()){}
  private async current(tx:Prisma.TransactionClient,actor:Actor,tokenHash:string){
   const session=await tx.session.findFirst({where:{tokenHash,userId:actor.id,expiresAt:{gt:new Date()},user:{isActive:true,organizationId:actor.organizationId}}});
   if(!session)throw new UnauthorizedException('Сессия истекла. Войдите снова');
@@ -46,9 +47,11 @@ export class AuthService {
    const user=await tx.user.findUniqueOrThrow({where:{id:actor.id}});
    if(user.passwordHash!==previous.passwordHash)throw new UnauthorizedException('Сессия истекла. Войдите снова');
    await tx.user.update({where:{id:actor.id},data:{passwordHash}});
+   await tx.passwordReset.deleteMany({where:{userId:actor.id}});
    await tx.session.deleteMany({where:{userId:actor.id}});
    const session=await createSession(tx,actor.id,userAgent);
    await this.audit.record(tx,actor,'ACCOUNT',actor.id,'PASSWORD_CHANGED');
+   await this.mail.enqueue(tx,user,'PASSWORD_CHANGED');
    return session;
   });
  }

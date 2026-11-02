@@ -4,5 +4,9 @@ import { AuditWriterModule } from '../modules/audit/audit-writer.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { SessionGuard } from './session.guard';
-@Module({imports:[DatabaseModule,AuditWriterModule],controllers:[AuthController],providers:[SessionGuard,AuthService],exports:[SessionGuard]})
+import { PasswordResetController } from './password-reset.controller';
+import { PasswordResetService } from './password-reset.service';
+import { PasswordResetDelivery } from './password-reset-delivery';
+import { MailModule } from '../modules/mail/mail.module';
+@Module({imports:[DatabaseModule,AuditWriterModule,MailModule],controllers:[AuthController,PasswordResetController],providers:[SessionGuard,AuthService,PasswordResetService,PasswordResetDelivery],exports:[SessionGuard]})
 export class AuthModule {}

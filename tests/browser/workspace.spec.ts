@@ -274,8 +274,13 @@ test('financial filters, historical records and complete order pickers work on m
  await page.getByRole('button',{name:'Войти в пространство'}).click();
  async function navigate(section:string){await page.getByRole('button',{name:'Меню',exact:true}).click();await page.getByRole('button',{name:section,exact:true}).click();}
  await navigate('Финансы');
+ const filteredMovements=page.waitForResponse(response=>{
+  const url=new URL(response.url());
+  return url.pathname==='/api/movements/search'&&url.searchParams.get('q')==='Archive browser expense'&&url.searchParams.get('from')==='2020-01-01'&&url.searchParams.get('to')==='2020-01-01';
+ });
  await page.getByPlaceholder('Описание, заказ или клиент').fill('Archive browser expense');
  await page.getByLabel('Дата с',{exact:true}).fill('2020-01-01');await page.getByLabel('Дата по',{exact:true}).fill('2020-01-01');
+ expect((await filteredMovements).status()).toBe(200);
  await expect(page.locator('.pagination')).toContainText('Всего: 205');
  await expect(page.locator('.report-stats')).toContainText('20,50');
  await expect(page.locator('.report-table tbody tr')).toHaveCount(20);

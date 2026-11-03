@@ -37,6 +37,7 @@ test('Financial and document reports: full data, exact totals and access boundar
   for(let page=1;page<=5;page++){
    const r=await request('/movements/search?q=Archive&pageSize=100&page='+page,a.cookie);
    assert.equal(r.status,200);assert.equal(r.body.total,411);assert.equal(r.body.pages,5);
+   for(const item of r.body.items)assert.deepEqual(Object.keys(item).sort(),['id','kind','amount','description','category','sourceId','orderId','orderNumber','createdAt'].sort());
    assert.deepEqual(r.body.summary,{received:'20.50',expenses:'6.18',cashFlow:'14.32'});
    items.push(...r.body.items);summary=r.body.summary;
   }

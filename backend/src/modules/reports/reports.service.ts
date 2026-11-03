@@ -7,6 +7,7 @@ import { movementCsv, MAX_MOVEMENT_EXPORT_ROWS } from './movement-export';
 type MovementRow={id:string;kind:'INCOME'|'EXPENSE'|'REFUND'|'EXPENSE_REVERSAL';sourceId:string|null;amount:Prisma.Decimal;description:string;category:string;orderId:string|null;orderNumber:number|null;createdAt:Date};
 type DocumentRow={status:string;version:number;id:string;number:number;kind:string;orderId:string;orderNumber:number;clientName:string;total:string;createdAt:Date};
 type Totals={total:bigint;received:Prisma.Decimal;expenses:Prisma.Decimal;cashFlow:Prisma.Decimal};
+type MovementReportRow=Omit<MovementRow,'id'>&Totals&{id:string|null};
 // UTC timestamps need explicit local boundaries. The upper bound is exclusive.
 function dates(query:{from?:string;to?:string}) {
  return Prisma.sql`${query.from?Prisma.sql`AND "createdAt" >= ((${query.from}::date::timestamp AT TIME ZONE 'Asia/Almaty') AT TIME ZONE 'UTC')`:Prisma.empty}
@@ -30,12 +31,17 @@ export class ReportsService {
  constructor(private readonly db:Database){}
  async movements(org:string,query:MovementQuery){
   const source=movementReportSource(org,query);
-  const [rows,totals]=await this.db.client.$transaction([
-   this.db.client.$queryRaw<MovementRow[]>(Prisma.sql`${source} SELECT id,kind,amount,description,category,"sourceId","orderId","orderNumber","createdAt" FROM filtered ORDER BY "createdAt" DESC,id DESC,kind DESC LIMIT ${query.pageSize} OFFSET ${(query.page-1)*query.pageSize}`),
-   this.db.client.$queryRaw<Totals[]>(Prisma.sql`${source} SELECT count(*) AS total,${receivedSql} AS received,${expensesSql} AS expenses,${cashFlowSql} AS "cashFlow" FROM filtered`),
-  ],{isolationLevel:Prisma.TransactionIsolationLevel.RepeatableRead});
-  const summary=totals[0],total=Number(summary.total);
-  return {items:rows.map(row=>({...row,amount:row.amount.toFixed(2)})),total,page:query.page,pageSize:query.pageSize,pages:Math.ceil(total/query.pageSize),
+  // One statement shares one MVCC snapshot and evaluates the ledger once.
+  // LEFT JOIN keeps totals available for an empty page, without a transaction lease.
+  const rows=await this.db.client.$queryRaw<MovementReportRow[]>(Prisma.sql`${source},
+   totals AS (SELECT count(*) AS total,${receivedSql} AS received,${expensesSql} AS expenses,${cashFlowSql} AS "cashFlow" FROM filtered),
+   page_rows AS (SELECT id,kind,amount,description,category,"sourceId","orderId","orderNumber","createdAt" FROM filtered ORDER BY "createdAt" DESC,id DESC,kind DESC LIMIT ${query.pageSize} OFFSET ${(query.page-1)*query.pageSize})
+   SELECT p.*,t.total,t.received,t.expenses,t."cashFlow" FROM totals t LEFT JOIN page_rows p ON TRUE
+   ORDER BY p."createdAt" DESC,p.id DESC,p.kind DESC`);
+  const summary=rows[0],total=Number(summary.total);
+  const items=rows.filter((row):row is MovementReportRow&{id:string}=>row.id!==null)
+   .map(({total:_total,received:_received,expenses:_expenses,cashFlow:_cashFlow,...row})=>({...row,amount:row.amount.toFixed(2)}));
+  return {items,total,page:query.page,pageSize:query.pageSize,pages:Math.ceil(total/query.pageSize),
    summary:{received:summary.received.toFixed(2),expenses:summary.expenses.toFixed(2),cashFlow:summary.cashFlow.toFixed(2)}};
  }
  async exportMovements(org:string,query:MovementExportQuery){

@@ -26,6 +26,7 @@
     "test": "npm run build -w @tirek/contracts && npm run test -w @tirek/api && npm run test:i18n",
     "test:integration": "node --test --test-concurrency=1 tests/*.integration.mjs",
     "test:e2e": "playwright test",
+    "test:lab10": "playwright test --config playwright.lab10.config.ts",
     "check:structure": "node scripts/check-structure.mjs",
     "test:i18n": "node --test tests/localization.test.mjs"
   },

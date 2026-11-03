@@ -41,7 +41,7 @@ export function Stat({ label, value, detail, icon, featured = false }: { label: 
 
 export function SearchBox({ value, setValue, placeholder }: { value: string; setValue: (s: string) => void; placeholder: string }) {
   const { t } = useI18n();
- return <label className="search-box"><Search size={17} /><input aria-label={t("Поиск")} value={value} onChange={e => setValue(e.target.value)} placeholder={placeholder} /></label>; }
+ return <label className="search-box"><Search size={17} /><input aria-label={t("Поиск")} maxLength={200} value={value} onChange={e => setValue(e.target.value)} placeholder={placeholder} /></label>; }
 
 export function Field({ label, ...props }: React.InputHTMLAttributes<HTMLInputElement> & { label: string }) {
 

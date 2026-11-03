@@ -54,6 +54,7 @@ TirekCRM/
 - [Создание компании и первые шаги](docs/company-onboarding.md)
 - [Безопасность аккаунта и сеансы](docs/account-security.md)
 - [Gmail, письма аккаунта и API восстановления доступа](docs/account-mail.md)
+- [Зертханалық жұмыс 10 — Microsoft Edge UI тестілері](docs/lab10-web-testing.md)
 - [Правила локализации](docs/localization.md)
 - [План выхода к пилоту](docs/roadmap.md)
 - [Изменения](docs/changelog.md)

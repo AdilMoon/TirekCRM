@@ -6,6 +6,16 @@ import {photoKey,compressTelegramPhoto} from './telegram-photo';
 import {telegramPairSchema,telegramConfirmSchema} from '@tirek/contracts';
 import {telegramUpdateSchema} from './telegram-processor';
 import {TelegramTransport,TelegramTransportError} from './telegram-transport';
+import {parseTaskAction} from './telegram-actions';
+import {tgText} from './telegram-text';
+test('task actions carry bounded versions within Telegram callback length and reject forged targets',()=>{
+ const taskId='12345678-1234-4123-8123-123456789012';
+ assert.deepEqual(parseTaskAction('start:'+taskId+':1'),{taskId,version:1,status:'IN_PROGRESS'});
+ assert.deepEqual(parseTaskAction('done:'+taskId+':2147483646'),{taskId,version:2147483646,status:'DONE'});
+ assert.ok(Buffer.byteLength('start:'+taskId+':2147483646')<=64);
+ for(const data of ['done:'+taskId+':0','done:'+taskId+':2147483647','done:'+taskId+':1extra','cancel:'+taskId+':1','done:not-a-uuid:1','start:'+taskId+':-1'])assert.equal(parseTaskAction(data),null);
+ assert.equal(tgText('ru','startWork'),'Начать работу');assert.equal(tgText('kk','finishTask'),'Тапсырманы аяқтау');assert.equal(tgText('en','finishTask'),'Complete task');
+});
 test('Telegram configuration fails closed without exposing credentials and defaults disabled',()=>{
  assert.equal(telegramConfig({}).enabled,false);
  assert.throws(()=>telegramConfig({TELEGRAM_DELIVERY:'unknown'}));

@@ -63,10 +63,10 @@ export class TelegramService {
   const link=await tx.telegramLink.findUnique({where:{botId_telegramUserId:{botId,telegramUserId:senderId}},include:{user:true}});
   if(link){await tx.telegramLink.delete({where:{id:link.id}});await tx.telegramPairing.deleteMany({where:{userId:link.userId}});await this.audit.record(tx,link.user,'ACCOUNT',link.userId,'TELEGRAM_DISCONNECTED',{});}return {ok:true};
  });}
- async task(linkId:string,id:string){
+ async task(linkId:string,id:string,includeClosed=false){
   const link=await this.db.client.telegramLink.findFirst({where:{id:linkId,user:{isActive:true,role:'EMPLOYEE'}}});
   if(!link)throw new ForbiddenException('Подключение Telegram отключено');
-  const task=await this.db.client.businessTask.findFirst({where:{id,organizationId:link.organizationId,assigneeId:link.userId,status:{in:['TODO','IN_PROGRESS']}},select:{id:true,title:true,description:true,dueDate:true,orderId:true,booking:{select:{startsAt:true,endsAt:true,releasedAt:true}}}});
+  const task=await this.db.client.businessTask.findFirst({where:{id,organizationId:link.organizationId,assigneeId:link.userId,...(!includeClosed?{status:{in:['TODO','IN_PROGRESS'] as ('TODO'|'IN_PROGRESS')[]}}:{})},select:{id:true,title:true,description:true,status:true,version:true,dueDate:true,orderId:true,booking:{select:{startsAt:true,endsAt:true,releasedAt:true}}}});
   if(!task)throw new NotFoundException('Задача больше не назначена вам');return {link,task};
  }
  async list(linkId:string,page:number){

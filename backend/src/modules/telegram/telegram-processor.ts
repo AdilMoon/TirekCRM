@@ -6,6 +6,8 @@ import {TelegramService} from './telegram.service';
 import {TelegramTransport,TelegramTransportError} from './telegram-transport';
 import {compressTelegramPhoto,photoKey} from './telegram-photo';
 import {tgText,tgDate} from './telegram-text';
+import {TasksService} from '../tasks/tasks.service';
+import {parseTaskAction} from './telegram-actions';
 const id=z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
 const sender=z.object({id,is_bot:z.boolean().optional(),first_name:z.string().max(256).optional(),last_name:z.string().max(256).optional(),username:z.string().regex(/^[A-Za-z0-9_]{1,32}$/).optional(),language_code:z.string().max(20).optional()});
 const message=z.object({message_id:id,date:z.number().int().nonnegative().optional(),chat:z.object({id:z.number().int().safe(),type:z.string()}),from:sender.optional(),text:z.string().max(4096).optional(),photo:z.array(z.object({file_id:z.string().min(1).max(1024),file_size:z.number().int().positive().optional(),width:z.number().int().positive(),height:z.number().int().positive()})).max(10).optional()});
@@ -13,15 +15,16 @@ export const telegramUpdateSchema=z.object({update_id:id,message:message.optiona
 @Injectable()
 export class TelegramProcessor {
  private readonly budgets=new Map<string,{at:number;count:number}>();
- constructor(private readonly db:Database,private readonly service:TelegramService,private readonly transport:TelegramTransport,private readonly passports:PassportService){}
+ constructor(private readonly db:Database,private readonly service:TelegramService,private readonly transport:TelegramTransport,private readonly passports:PassportService,private readonly tasks:TasksService){}
  private allowed(sender:string){const now=Date.now(),old=this.budgets.get(sender);if(!old||old.at<now-60000){if(this.budgets.size>=10000)this.budgets.clear();this.budgets.set(sender,{at:now,count:1});return true;}return ++old.count<=20;}
  async card(linkId:string,taskId:string,assigned=false){
-  const {link,task}=await this.service.task(linkId,taskId),locale=link.locale;
-  let text=(assigned?tgText(locale,'assigned')+'\n':'')+task.title;
+  const {link,task}=await this.service.task(linkId,taskId,!assigned),locale=link.locale,active=task.status==='TODO'||task.status==='IN_PROGRESS';
+  let text=(assigned?tgText(locale,'assigned')+'\n':'')+task.title+'\n'+tgText(locale,task.status==='TODO'?'todo':task.status==='IN_PROGRESS'?'inProgress':task.status==='DONE'?'done':'cancelledTask');
   if(task.booking&&!task.booking.releasedAt)text+='\n'+tgDate(task.booking.startsAt,locale)+' — '+tgDate(task.booking.endsAt,locale)+' (Алматы)';
   else if(task.dueDate)text+='\n'+new Intl.DateTimeFormat(locale==='kk'?'kk-KZ':locale==='en'?'en-GB':'ru-KZ',{timeZone:'Asia/Almaty',day:'numeric',month:'short'}).format(task.dueDate);
   if(task.description)text+='\n\n'+task.description.slice(0,1500);
-  return this.transport.send(link.telegramUserId,text,[...(task.orderId?[[{text:tgText(locale,'photo'),callback_data:'photo:'+task.id}]]:[]),[{text:tgText(locale,'tasks'),callback_data:'list:1'}]]);
+  if(task.status==='IN_PROGRESS'&&task.orderId)text+='\n\n'+tgText(locale,'photoBeforeDone');
+  return this.transport.send(link.telegramUserId,text,[...(active?[[{text:tgText(locale,task.status==='TODO'?'startWork':'finishTask'),callback_data:(task.status==='TODO'?'start:':'done:')+task.id+':'+task.version}]]:[]),...(active&&task.orderId?[[{text:tgText(locale,'photo'),callback_data:'photo:'+task.id}]]:[]),[{text:tgText(locale,'tasks'),callback_data:'list:1'}]]);
  }
  async handle(raw:unknown){
   try{return await this.process(raw);}catch(error){
@@ -47,6 +50,12 @@ export class TelegramProcessor {
   const locale=link.locale;
   try{
    const data=callback?.data??'';
+   const action=parseTaskAction(data);
+   if(action){
+    try{await this.tasks.status(link.user,action.taskId,action.status,action.version,{linkId:link.id,botId,telegramUserId:senderId});}
+    catch(error){if(error instanceof HttpException&&error.getStatus()===409){await this.transport.send(senderId,tgText(locale,'staleAction'),[[{text:tgText(locale,'tasks'),callback_data:'list:1'}]]);return;}throw error;}
+    await this.card(link.id,action.taskId);return;
+   }
    if(command==='/cancel'){await this.db.client.telegramLink.updateMany({where:{id:link.id},data:{selectedAt:null,selectedTaskId:null}});await this.transport.send(senderId,tgText(locale,'cancelled'));return;}
    if(command==='/tasks'||command==='/start'||/^list:[1-9]\d{0,3}$/.test(data)){
     const page=data.startsWith('list:')?Number(data.slice(5)):1,result=await this.service.list(link.id,page);
@@ -57,11 +66,13 @@ export class TelegramProcessor {
    if(/^(?:task|photo):[a-f0-9-]{36}$/.test(data)){
     const taskId=data.split(':')[1];if(!z.uuid().safeParse(taskId).success)return;
     if(data.startsWith('task:')){await this.card(link.id,taskId);return;}
+    const current=await this.service.task(link.id,taskId,true);
+    if(!['TODO','IN_PROGRESS'].includes(current.task.status)){await this.transport.send(senderId,tgText(locale,'closedPhoto'),[[{text:tgText(locale,'tasks'),callback_data:'list:1'}]]);return;}
     await this.service.selectPhoto(link.id,taskId);await this.transport.send(senderId,tgText(locale,'select'));return;
    }
    if(update.message?.photo?.length){
     if(!link.selectedTaskId||!link.selectedAt||link.selectedAt.getTime()<Date.now()-900000||!msg.date||msg.date<Math.floor(Math.max(link.createdAt.getTime(),link.selectedAt.getTime())/1000)||msg.date*1000>Date.now()+60000){await this.transport.send(senderId,tgText(locale,'noSelection'));return;}
-    const {task}=await this.service.task(link.id,link.selectedTaskId);if(!task.orderId){await this.transport.send(senderId,tgText(locale,'unavailable'));return;}
+    const {task}=await this.service.task(link.id,link.selectedTaskId,true);if(!['TODO','IN_PROGRESS'].includes(task.status)){await this.transport.send(senderId,tgText(locale,'closedPhoto'));return;}if(!task.orderId){await this.transport.send(senderId,tgText(locale,'unavailable'));return;}
     const size=[...update.message.photo].filter(p=>!p.file_size||p.file_size<=5_000_000).sort((a,b)=>b.width*b.height-a.width*a.height)[0];
     if(!size){await this.transport.send(senderId,tgText(locale,'badPhoto'));return;}
     let image:string;

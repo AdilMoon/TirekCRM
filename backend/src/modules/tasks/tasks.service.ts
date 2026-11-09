@@ -62,13 +62,16 @@ export class TasksService {
    return task;
   });
  }
- status(actor:Actor,id:string,status:TaskStatus,version:number) {
+ status(actor:Actor,id:string,status:TaskStatus,version:number,telegram?:{linkId:string;botId:string;telegramUserId:string}) {
   return serializable(this.db.client,async tx=>{
    // Recheck active access in the transaction, including concurrent account deactivation.
    const current=await tx.user.findUnique({where:{id:actor.id}});
-   if(!current?.isActive)throw new ForbiddenException('Доступ сотрудника отключён');
+   if(!current?.isActive||current.organizationId!==actor.organizationId||current.role!==actor.role)throw new ForbiddenException('Доступ сотрудника отключён');
+   if(telegram&&(current.role!=='EMPLOYEE'||!await tx.telegramLink.findFirst({where:{id:telegram.linkId,userId:actor.id,organizationId:actor.organizationId,botId:telegram.botId,telegramUserId:telegram.telegramUserId}})))throw new ForbiddenException('Подключение Telegram отключено');
    const previous=await tx.businessTask.findFirst({where:{...this.scope(actor),id}});
    if(!previous)throw new NotFoundException('Задача не найдена');
+   // A replay may acknowledge the immediately committed result, never advance it again.
+   if(telegram&&previous.version===version+1&&previous.status===status)return tx.businessTask.findUniqueOrThrow({where:{id},select:taskSelect});
    if(previous.version!==version)throw new ConflictException('Задача уже изменена. Обновите список');
    const employeeTransitions:Record<TaskStatus,TaskStatus[]>={TODO:['IN_PROGRESS'],IN_PROGRESS:['TODO','DONE'],DONE:[],CANCELLED:[]};
    if(actor.role==='EMPLOYEE'&&!employeeTransitions[previous.status].includes(status))throw new ForbiddenException('Этот переход задачи недоступен');
@@ -76,7 +79,8 @@ export class TasksService {
    if(status==='CANCELLED'&&await tx.workBooking.findFirst({where:{taskId:id,organizationId:actor.organizationId,releasedAt:null}}))throw new ConflictException('Сначала отмените назначение в карточке заказа');
    if(['TODO','IN_PROGRESS'].includes(status)&&await tx.workBooking.findFirst({where:{taskId:id,releasedAt:{not:null}}}))throw new ConflictException('Освобождённое назначение нельзя вернуть через задачу');
    const task=await tx.businessTask.update({where:{id},data:{status,version:{increment:1}},select:taskSelect});
-   await this.audit.record(tx,actor,'TASK',id,'TASK_STATUS_CHANGED',{title:task.title,from:previous.status,to:status});
+   if(telegram&&status==='DONE')await tx.telegramLink.updateMany({where:{id:telegram.linkId,selectedTaskId:id},data:{selectedTaskId:null,selectedAt:null}});
+   await this.audit.record(tx,actor,'TASK',id,'TASK_STATUS_CHANGED',{title:task.title,from:previous.status,to:status,...(telegram?{source:'TELEGRAM'}:{})});
    await publishTaskNotification(tx,{organizationId:actor.organizationId,taskId:id,actorId:actor.id,actorName:actor.name,kind:'TASK_STATUS_CHANGED',eventKey:'task:'+id+':status:'+task.version});
    return task;
   });

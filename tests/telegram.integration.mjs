@@ -23,7 +23,7 @@ class FakeTelegram {
  async send(chatId,text,buttons){if(this.fail){const code=this.fail;this.fail=0;throw new TelegramTransportError(code,1);}this.messages.push({chatId,text,buttons});return {message_id:this.messages.length};}
  async photo(){if(this.downloadHook){const hook=this.downloadHook;this.downloadHook=null;await hook();}return this.image;}
 }
-const fake=new FakeTelegram(),service=new TelegramService({client:db},fake,audit),processor=new TelegramProcessor({client:db},service,fake,passports),worker=new TelegramWorker({client:db},fake,processor,service);
+const fake=new FakeTelegram(),service=new TelegramService({client:db},fake,audit),processor=new TelegramProcessor({client:db},service,fake,passports,tasks),worker=new TelegramWorker({client:db},fake,processor,service);
 let updateId=0;
 const update=(text,extra={})=>({update_id:++updateId,message:{message_id:updateId,date:Math.floor(Date.now()/1000),from:{id:Number(senderId),first_name:'Test Employee',username:'staff_fixture',language_code:'kk'},chat:{id:Number(senderId),type:'private'},...(text?{text}:{}),...extra}});
 const callback=data=>({update_id:++updateId,callback_query:{id:'fixture'+updateId,from:{id:Number(senderId),first_name:'Test Employee'},message:{message_id:999,from:{id:Number(botId),is_bot:true},chat:{id:Number(senderId),type:'private'}},data}});
@@ -56,6 +56,20 @@ test('Telegram employee binding notifications and result photos preserve identit
    await assert.rejects(()=>service.task(link.id,otherTask.id),status(404));await assert.rejects(()=>service.selectPhoto(link.id,otherTask.id),status(404));
    await processor.handle(callback('task:'+ownTask.id));const own=JSON.stringify(fake.messages.at(-1));for(const secret of ['+77009998877','secret client notes','12345.67'])assert.equal(own.includes(secret),false);
   });
+  await t.test('status buttons enforce transitions versions replay safety and closed-photo explanations',async()=>{
+   const p=new TelegramProcessor({client:db},service,fake,passports,tasks),task=await db.businessTask.create({data:{organizationId:org,createdById:owner.id,assigneeId:employee.id,orderId:order.id,title:'Status button fixture'}});
+   await p.card(link.id,task.id);assert.ok(fake.messages.at(-1).buttons.flat().some(b=>b.callback_data==='start:'+task.id+':1'));assert.equal(fake.messages.at(-1).buttons.flat().some(b=>b.callback_data.startsWith('done:')),false);
+   const start=callback('start:'+task.id+':1');await p.handle(start);await p.handle(start);
+   let current=await db.businessTask.findUniqueOrThrow({where:{id:task.id}});assert.equal(current.status,'IN_PROGRESS');assert.equal(current.version,2);assert.ok(fake.messages.at(-1).buttons.flat().some(b=>b.callback_data==='done:'+task.id+':2'));
+   assert.equal(await db.auditEvent.count({where:{organizationId:org,entityId:task.id,action:'TASK_STATUS_CHANGED'}}),1);assert.equal(await db.notification.count({where:{taskId:task.id,kind:'TASK_STATUS_CHANGED',recipientId:owner.id}}),1);
+   await tasks.update(owner,task.id,{title:'Edited task',description:'',orderId:order.id,assigneeId:employee.id,dueDate:null,version:2});await p.handle(callback('done:'+task.id+':2'));current=await db.businessTask.findUniqueOrThrow({where:{id:task.id}});assert.equal(current.status,'IN_PROGRESS');assert.equal(current.version,3);
+   await service.selectPhoto(link.id,task.id);const done=callback('done:'+task.id+':3');await p.handle(done);await p.handle(done);
+   current=await db.businessTask.findUniqueOrThrow({where:{id:task.id}});assert.equal(current.status,'DONE');assert.equal(current.version,4);assert.equal((await db.telegramLink.findUniqueOrThrow({where:{id:link.id}})).selectedTaskId,null);
+   assert.equal(fake.messages.at(-1).buttons.flat().some(b=>/^(start|done|photo):/.test(b.callback_data)),false);assert.equal(await db.auditEvent.count({where:{organizationId:org,entityId:task.id,action:'TASK_STATUS_CHANGED'}}),2);assert.equal(await db.notification.count({where:{taskId:task.id,kind:'TASK_STATUS_CHANGED',recipientId:owner.id}}),2);
+   await p.handle(start);assert.equal((await db.businessTask.findUniqueOrThrow({where:{id:task.id}})).status,'DONE');await p.handle(callback('photo:'+task.id));assert.ok(/аяқталған|completed|завершена/.test(fake.messages.at(-1).text));
+   const next=await db.businessTask.create({data:{organizationId:org,createdById:owner.id,assigneeId:employee.id,title:'Cannot skip work'}});await p.handle(callback('done:'+next.id+':1'));assert.equal((await db.businessTask.findUniqueOrThrow({where:{id:next.id}})).status,'TODO');
+   await db.businessTask.deleteMany({where:{id:{in:[task.id,next.id]},organizationId:org}});
+  });
   await t.test('assignment outbox commits with task, delivers once and retries provider failures',async()=>{
    const task=await tasks.create(owner,{title:'New Telegram task',description:'Work details',assigneeId:employee.id,orderId:order.id,dueDate:null});
    const delivery=await db.telegramDelivery.findFirstOrThrow({where:{linkId:link.id,notification:{taskId:task.id}}});assert.equal(delivery.status,'PENDING');
@@ -85,6 +99,19 @@ test('Telegram employee binding notifications and result photos preserve identit
    await db.telegramPairing.update({where:{id:second.id},data:{expiresAt:new Date(Date.now()-1)}});assert.equal(await service.claim(botId,new URL(second.url).searchParams.get('start'),{id:senderId,name:'Staff',username:''}),false);
    pair=await service.pair(employee,'ru');await service.claim(botId,new URL(pair.url).searchParams.get('start'),{id:senderId,name:'Staff',username:''});link=await service.confirm(employee,pair.id,'ru');
    const other=await service.pair(foreign,'ru');assert.equal(await service.claim(botId,new URL(other.url).searchParams.get('start'),{id:senderId,name:'Staff',username:''}),false);assert.equal((await service.status(foreign)).linked,null);
+  });
+  await t.test('status mutation rechecks binding current assignee active role and rolls back failed audit',async()=>{
+   const task=await db.businessTask.create({data:{organizationId:org,createdById:owner.id,assigneeId:employee.id,title:'Permission fixture'}}),context={linkId:link.id,botId,telegramUserId:senderId};
+   await assert.rejects(()=>tasks.status(employee,otherTask.id,'IN_PROGRESS',1,context),status(404));
+   const foreignTask=await db.businessTask.create({data:{organizationId:otherOrg,createdById:foreign.id,assigneeId:foreign.id,title:'Foreign fixture'}});await assert.rejects(()=>tasks.status(employee,foreignTask.id,'IN_PROGRESS',1,context),status(404));
+   await db.user.update({where:{id:employee.id},data:{isActive:false}});try{await assert.rejects(()=>tasks.status(employee,task.id,'IN_PROGRESS',1,context),status(403));}finally{await db.user.update({where:{id:employee.id},data:{isActive:true}});}
+   await db.user.update({where:{id:employee.id},data:{role:'OWNER'}});try{await assert.rejects(()=>tasks.status(employee,task.id,'IN_PROGRESS',1,context),status(403));}finally{await db.user.update({where:{id:employee.id},data:{role:'EMPLOYEE'}});}
+   const broken=new TasksService({client:db},{record:async()=>{throw Error('audit fixture');}});await assert.rejects(()=>broken.status(employee,task.id,'IN_PROGRESS',1,context));assert.equal((await db.businessTask.findUniqueOrThrow({where:{id:task.id}})).status,'TODO');
+   const relay={status:async(...args)=>{await service.disconnect(employee);return tasks.status(...args);}},p=new TelegramProcessor({client:db},service,fake,passports,relay);await p.handle(callback('start:'+task.id+':1'));assert.equal((await db.businessTask.findUniqueOrThrow({where:{id:task.id}})).status,'TODO');
+   pair=await service.pair(employee,'ru');await service.claim(botId,new URL(pair.url).searchParams.get('start'),{id:senderId,name:'Staff',username:''});link=await service.confirm(employee,pair.id,'ru');await assert.rejects(()=>tasks.status(employee,task.id,'IN_PROGRESS',1,context),status(403));
+   assert.equal((await req('/tasks/'+task.id+'/status',{status:'IN_PROGRESS',version:1,telegram:context},employee.cookie,'PATCH')).status,400);
+   const fresh={linkId:link.id,botId,telegramUserId:senderId};await Promise.all([tasks.status(employee,task.id,'IN_PROGRESS',1,fresh),tasks.status(employee,task.id,'IN_PROGRESS',1,fresh)]);assert.equal((await db.businessTask.findUniqueOrThrow({where:{id:task.id}})).version,2);assert.equal(await db.auditEvent.count({where:{organizationId:org,entityId:task.id,action:'TASK_STATUS_CHANGED'}}),1);
+   await db.businessTask.deleteMany({where:{id:{in:[task.id,foreignTask.id]},organizationId:{in:[org,otherOrg]}}});
   });
   await t.test('durable offset receipts and per-bot lease prevent simultaneous pollers and replay',async()=>{
    const second=new TelegramWorker({client:db},fake,processor,service);fake.delay=100;const before=fake.polls;await Promise.all([worker.runOnce(),second.runOnce()]);assert.equal(fake.polls,before+1);fake.delay=0;

@@ -24,6 +24,7 @@ import { ClientDirectory, OrderDirectory } from '../features/directories';
 import { AuditTrail } from '../features/audit-trail';
 import { Editor } from '../features/editor';
 import { AccountSecurity } from '../features/account-security';
+import {TelegramConnect} from '../features/telegram-connect';
 import { OrganizationSettings } from '../features/organization-settings';
 import type { Section, Modal } from '../types/workspace';
 export default function Workspace() {
@@ -119,7 +120,7 @@ const navigation = [
       {section === 'history' && <AuditTrail revision={data}/>}
       {section === 'finances' && <FinanceReport revision={data} onChanged={()=>{refresh().catch(e=>setError(e.message));}} onOrder={id=>openOrder({id})}/>}
       {section === 'documents' && <DocumentDirectory revision={data}/>}
-      {section === 'settings' && <div className="settings-space"><PrivacyRequests/><OrganizationSettings onSaved={async () => { setUser(await api<SessionUser>('/auth/me')); setToast(t("Реквизиты сохранены")); }} /><AccountSecurity onSessionEnded={expired=>{setUser(null);setData(emptyData);setError(expired?'Сессия истекла. Войдите снова':'');}}/></div>}
+      {section === 'settings' && <div className="settings-space"><PrivacyRequests/><OrganizationSettings onSaved={async () => { setUser(await api<SessionUser>('/auth/me')); setToast(t("Реквизиты сохранены")); }} /><TelegramConnect/><AccountSecurity onSessionEnded={expired=>{setUser(null);setData(emptyData);setError(expired?'Сессия истекла. Войдите снова':'');}}/></div>}
 <footer className="page-footer"><span>{t("Tirek · опора вашего бизнеса")}</span><span>{refreshing ? t("Обновляем данные…") : t("Данные вашего рабочего пространства")}</span></footer>
     </main></div>
     {toast && <div className="toast" role="status"><CheckCircle2 size={19} />{t(toast)}</div>}

@@ -17,6 +17,7 @@
 | backend/src/modules/reports | Фильтры, объединённый финансовый отчёт и поиск документов |
 | backend/src/modules/tasks | Назначения, сроки, версии и разрешённые переходы |
 | backend/src/modules/scheduling | Рабочие профили, объяснимый подбор, временные резервы и атомарная связь с задачами/заказами |
+| backend/src/modules/telegram | Подтверждённая привязка сотрудников, Bot API long polling, очередь назначений и приватные фото результатов |
 | backend/src/modules/notifications | Запись уведомлений внутри транзакции события, личный список, счётчик и прочтение |
 | backend/src/modules/audit | AuditWriterModule: запись событий без зависимости от AuthModule; AuditModule: защищённое чтение истории |
 | backend/src/database | Подключение PostgreSQL через Prisma |

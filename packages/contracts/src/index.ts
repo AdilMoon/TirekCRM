@@ -311,3 +311,11 @@ export interface AssignmentState {orderVersion:number;status:Stage;current:Booki
 export type CandidateBlock='INACTIVE'|'PROFILE_REQUIRED'|'MISSING_SKILLS'|'OUTSIDE_HOURS'|'OVERLAP';
 export interface AssignmentCandidate {id:string;name:string;profileVersion:number|null;eligible:boolean;blocks:CandidateBlock[];missingSkills:string[];workloadMinutes:number;activeTasks:number}
 export interface AssignmentRecommendations {orderVersion:number;currentBookingId:string|null;startsAt:string;endsAt:string;recommendedId:string|null;candidates:AssignmentCandidate[]}
+
+export const telegramPairSchema=z.object({locale:z.enum(['ru','kk','en'])}).strict();
+export const telegramConfirmSchema=telegramPairSchema.extend({pairingId:z.uuid()}).strict();
+export interface TelegramConnection {
+ enabled:boolean;botUsername:string|null;eligible:boolean;
+ linked:{id:string;displayName:string;username:string;locale:'ru'|'kk'|'en'}|null;
+ pending:{id:string;expiresAt:string;displayName:string;username:string;claimed:boolean}|null;
+}

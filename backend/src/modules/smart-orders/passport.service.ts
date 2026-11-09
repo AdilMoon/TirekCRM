@@ -29,9 +29,12 @@ export class PassportService {
   const order=await tx.order.findFirst({where:{id:orderId,organizationId:actor.organizationId}});
   if(!order)throw new NotFoundException('Заказ не найден');return order;
  }
- private async photoAccess(tx:Prisma.TransactionClient,actor:Actor,id:string){
+ private async photoAccess(tx:Prisma.TransactionClient,actor:Actor,id:string,telegram?:{linkId:string;taskId:string}){
   const user=await tx.user.findFirst({where:{id:actor.id,organizationId:actor.organizationId,isActive:true}});
   if(!user)throw new ForbiddenException('Недостаточно прав');
+  if(telegram){
+   if(user.role!=='EMPLOYEE'||!await tx.telegramLink.findFirst({where:{id:telegram.linkId,userId:actor.id,organizationId:actor.organizationId,selectedTaskId:telegram.taskId,selectedAt:{gt:new Date(Date.now()-900000)}}})||!await tx.businessTask.findFirst({where:{id:telegram.taskId,orderId:id,organizationId:actor.organizationId,assigneeId:actor.id,status:{in:['TODO','IN_PROGRESS']}}}))throw new ForbiddenException('Недостаточно прав');
+  }
   const order=await tx.order.findFirst({where:{id,organizationId:actor.organizationId}});
   if(!order)throw new NotFoundException('Заказ не найден');
   if(user.role!=='OWNER'&&!await tx.businessTask.findFirst({where:{organizationId:actor.organizationId,orderId:id,assigneeId:actor.id,status:{in:['TODO','IN_PROGRESS']}}}))throw new ForbiddenException('Недостаточно прав');
@@ -65,7 +68,7 @@ export class PassportService {
    return {ok:true};
   });
  }
- async photo(actor:Actor,id:string,input:PassportPhotoInput){
+ async photo(actor:Actor,id:string,input:PassportPhotoInput,telegram?:{linkId:string;taskId:string}){
   const bytes=Buffer.from(input.image,'base64');
   if(bytes.length>300000||bytes.toString('base64')!==input.image)throw new BadRequestException('Не удалось обработать фото');
   const jpeg=bytes[0]===0xff&&bytes[1]===0xd8&&bytes[2]===0xff;
@@ -73,7 +76,7 @@ export class PassportService {
   const webp=bytes.toString('ascii',0,4)==='RIFF'&&bytes.toString('ascii',8,12)==='WEBP';
   if(!jpeg&&!png&&!webp)throw new BadRequestException('Не удалось обработать фото');
   // Check tenancy before doing CPU-intensive image decoding.
-  await this.db.client.$transaction(tx=>this.photoAccess(tx,actor,id));
+  await this.db.client.$transaction(tx=>this.photoAccess(tx,actor,id,telegram));
   let image:Buffer;
   try{
    const source=sharp(bytes,{limitInputPixels:12000000,failOn:'warning'}),meta=await source.metadata();
@@ -83,7 +86,7 @@ export class PassportService {
   if(image.length>200000)throw new BadRequestException('Фото слишком большое после обработки');
   const inputHash=digest(input.image+'|'+input.phase+'|'+input.shared);
   return serializable(this.db.client,async tx=>{
-   const {order}=await this.photoAccess(tx,actor,id);
+   const {order}=await this.photoAccess(tx,actor,id,telegram);
    const old=await tx.orderPhoto.findUnique({where:{orderId_idempotencyKey:{orderId:id,idempotencyKey:input.idempotencyKey}}});
    if(old){if(old.inputHash!==inputHash||old.createdById!==actor.id)throw new ConflictException('Ключ операции уже использован');return {id:old.id};}
    if(await tx.orderPhoto.count({where:{orderId:id,organizationId:actor.organizationId}})>=6)throw new ConflictException('В паспорте можно сохранить до 6 фото');

@@ -1,0 +1,19 @@
+import type {TelegramLocale} from './telegram.service';
+const words={
+ connect:['Откройте личную ссылку подключения в TirekCRM → Telegram.','TirekCRM → Telegram бөлімінде жеке қосылу сілтемесін ашыңыз.','Open your personal connection link in TirekCRM → Telegram.'],
+ confirm:['Вернитесь в TirekCRM, обновите состояние, проверьте Telegram-профиль и подтвердите подключение.','TirekCRM-ге оралып, күйді жаңартыңыз, Telegram профилін тексеріп, қосылуды растаңыз.','Return to TirekCRM, refresh the status, check the Telegram profile and confirm the connection.'],
+ invalid:['Ссылка недоступна. Создайте новую ссылку подключения в CRM.','Сілтеме қолжетімсіз. CRM ішінде жаңа қосылу сілтемесін жасаңыз.','The link is unavailable. Create a new connection link in CRM.'],
+ tasks:['Ваши активные задачи','Белсенді тапсырмаларыңыз','Your active tasks'],empty:['Активных задач нет.','Белсенді тапсырмалар жоқ.','No active tasks.'],
+ photo:['Фото результата','Нәтиже фотосы','Result photo'],
+ select:['Отправьте фото обычным изображением в этот чат в течение 15 минут. Оно сохранится в CRM как приватное фото результата. /cancel — отменить выбор.','15 минут ішінде осы чатқа кәдімгі сурет жіберіңіз. Ол CRM-де нәтиженің жеке фотосы ретінде сақталады. /cancel — таңдауды болдырмау.','Send a regular photo to this chat within 15 minutes. It will be saved in CRM as a private result photo. /cancel clears the selection.'],
+ saved:['Фото результата сохранено в CRM. Клиенту оно пока не опубликовано.','Нәтиже фотосы CRM-де сақталды. Клиентке әлі жарияланбаған.','Result photo saved in CRM. It has not been published to the customer.'],
+ unavailable:['Действие недоступно. Обновите /tasks: задача могла измениться, завершиться или перейти другому исполнителю.','Әрекет қолжетімсіз. /tasks жаңартыңыз: тапсырма өзгерген, аяқталған немесе басқа орындаушыға берілген болуы мүмкін.','Action unavailable. Refresh /tasks: the task may have changed, ended or been reassigned.'],
+ noSelection:['Сначала откройте задачу через /tasks и нажмите «Фото результата».','Алдымен /tasks арқылы тапсырманы ашып, «Нәтиже фотосы» түймесін басыңыз.','Open a task through /tasks and select Result photo first.'],
+ badPhoto:['Не удалось сохранить фото. Отправьте обычную фотографию до 5 МБ; в заказе допускается до 6 снимков.','Фотосурет сақталмады. 5 МБ-қа дейінгі кәдімгі фотосурет жіберіңіз; тапсырысқа 6 фотоға дейін рұқсат етіледі.','Could not save the photo. Send a regular photo up to 5 MB; an order allows up to 6 photos.'],
+ next:['Далее','Келесі','Next'],back:['Назад','Артқа','Back'],cancelled:['Выбор фото отменён. /tasks — ваши задачи.','Фото таңдау тоқтатылды. /tasks — тапсырмаларыңыз.','Photo selection cleared. /tasks lists your tasks.'],
+ stopped:['Подключение Telegram отключено. Вернуть его можно в TirekCRM.','Telegram қосылымы өшірілді. Оны TirekCRM ішінде қайта қосуға болады.','Telegram disconnected. You can reconnect in TirekCRM.'],
+ help:['/tasks — ваши задачи. Откройте задачу и нажмите «Фото результата». /cancel — отменить выбор фото. /stop — отключить Telegram.','/tasks — тапсырмаларыңыз. Тапсырманы ашып, «Нәтиже фотосы» түймесін басыңыз. /cancel — фото таңдауды тоқтату. /stop — Telegram-ды өшіру.','/tasks lists your tasks. Open a task and select Result photo. /cancel clears the photo selection. /stop disconnects Telegram.'],
+ assigned:['Вам назначена задача','Сізге тапсырма тағайындалды','A task was assigned to you'],open:['Открыть задачу','Тапсырманы ашу','Open task'],
+ } as const;
+export function tgText(locale:string,key:keyof typeof words){return words[key][locale==='kk'?1:locale==='en'?2:0];}
+export function tgDate(date:Date,locale:string){return new Intl.DateTimeFormat(locale==='kk'?'kk-KZ':locale==='en'?'en-GB':'ru-KZ',{timeZone:'Asia/Almaty',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}).format(date);}

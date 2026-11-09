@@ -2994,5 +2994,101 @@
   "Исполнитель выбран владельцем": {
     "kk": "Орындаушыны иесі таңдады",
     "en": "Assignee selected by the owner"
+  },
+  "Задачи и фото результата в личном чате с ботом": {
+    "kk": "Ботпен жеке чатта тапсырмалар мен нәтиже фотолары",
+    "en": "Tasks and result photos in a private bot chat"
+  },
+  "Настроить Telegram": {
+    "kk": "Telegram баптау",
+    "en": "Configure Telegram"
+  },
+  "Подключение Telegram": {
+    "kk": "Telegram қосу",
+    "en": "Connect Telegram"
+  },
+  "Telegram-бот пока не настроен": {
+    "kk": "Telegram боты әзірге бапталмаған",
+    "en": "The Telegram bot is not configured yet"
+  },
+  "Бот": {
+    "kk": "Бот",
+    "en": "Bot"
+  },
+  "Подключение Telegram доступно в аккаунте сотрудника": {
+    "kk": "Telegram қосылымы қызметкер аккаунтында қолжетімді",
+    "en": "Telegram connection is available in an employee account"
+  },
+  "После подключения бот получает названия, описания и время назначенных вам задач. Фото сохраняются в CRM приватно. Подключайте только свой Telegram.": {
+    "kk": "Қосылғаннан кейін бот сізге тағайындалған тапсырмалардың атауларын, сипаттамаларын және уақытын алады. Фотолар CRM-де жеке сақталады. Тек өз Telegram аккаунтыңызды қосыңыз.",
+    "en": "Once connected, the bot receives the titles, descriptions and times of your assigned tasks. Photos are saved privately in CRM. Connect only your own Telegram account."
+  },
+  "Telegram подключён": {
+    "kk": "Telegram қосылды",
+    "en": "Telegram connected"
+  },
+  "В боте отправьте /tasks, откройте задачу и нажмите «Фото результата».": {
+    "kk": "Ботқа /tasks жіберіңіз, тапсырманы ашып, «Нәтиже фотосы» түймесін басыңыз.",
+    "en": "Send /tasks to the bot, open a task and select Result photo."
+  },
+  "Отключить Telegram": {
+    "kk": "Telegram өшіру",
+    "en": "Disconnect Telegram"
+  },
+  "Создать новую ссылку подключения": {
+    "kk": "Жаңа қосылу сілтемесін жасау",
+    "en": "Create a new connection link"
+  },
+  "Создать ссылку подключения": {
+    "kk": "Қосылу сілтемесін жасау",
+    "en": "Create connection link"
+  },
+  "Открыть бота и нажать Start": {
+    "kk": "Ботты ашып, Start басу",
+    "en": "Open the bot and press Start"
+  },
+  "Ссылка действует до {0}. Новая ссылка отключает предыдущую.": {
+    "kk": "Сілтеме {0} дейін жарамды. Жаңа сілтеме алдыңғысын өшіреді.",
+    "en": "Link expires at {0}. A new link disables the previous one."
+  },
+  "Проверьте Telegram-профиль": {
+    "kk": "Telegram профилін тексеріңіз",
+    "en": "Check the Telegram profile"
+  },
+  "Это мой Telegram. Разрешаю присылать мне рабочие задачи.": {
+    "kk": "Бұл менің Telegram аккаунтым. Маған жұмыс тапсырмаларын жіберуге рұқсат беремін.",
+    "en": "This is my Telegram account. I allow work tasks to be sent to me."
+  },
+  "Подтвердить подключение": {
+    "kk": "Қосылуды растау",
+    "en": "Confirm connection"
+  },
+  "Откройте личную ссылку, нажмите Start в Telegram и обновите состояние здесь.": {
+    "kk": "Жеке сілтемені ашып, Telegram ішінде Start басыңыз да, осы жерде күйді жаңартыңыз.",
+    "en": "Open your personal link, press Start in Telegram, then refresh the status here."
+  },
+  "Обновить состояние": {
+    "kk": "Күйді жаңарту",
+    "en": "Refresh status"
+  },
+  "Сначала отключите прежнее подключение Telegram": {
+    "kk": "Алдымен бұрынғы Telegram қосылымын өшіріңіз",
+    "en": "Disconnect the previous Telegram connection first"
+  },
+  "Откройте бота по ссылке и обновите состояние": {
+    "kk": "Ботты сілтеме арқылы ашып, күйді жаңартыңыз",
+    "en": "Open the bot using the link and refresh the status"
+  },
+  "Этот Telegram уже подключён. Сначала отключите прежнюю привязку": {
+    "kk": "Бұл Telegram қосылған. Алдымен бұрынғы байланысты өшіріңіз",
+    "en": "This Telegram account is already connected. Disconnect the previous link first"
+  },
+  "Telegram подключён к аккаунту": {
+    "kk": "Telegram аккаунтқа қосылды",
+    "en": "Telegram connected to account"
+  },
+  "Telegram отключён от аккаунта": {
+    "kk": "Telegram аккаунттан ажыратылды",
+    "en": "Telegram disconnected from account"
   }
 }

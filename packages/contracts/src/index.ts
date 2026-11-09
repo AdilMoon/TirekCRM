@@ -251,3 +251,35 @@ export interface FinancialOperation {
  replacementExpenseId?:string|null;replacesExpenseId?:string|null;
  category?:string;orderId?:string|null;
 }
+
+const invalidMessageControl=/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f\ud800-\udfff]/u;
+export const messagePreviewSchema=z.object({message:z.string().trim().min(5).max(2000).refine(v=>!invalidMessageControl.test(v))}).strict();
+export const messageOrderSchema=z.object({
+ idempotencyKey:z.uuid().transform(v=>v.toLowerCase()),
+ clientId:z.uuid().transform(v=>v.toLowerCase()).optional(),
+ newClient:z.object({name:text(160),phone:z.string().trim().max(32).default('')}).strict().optional(),
+ order:orderSchema.omit({clientId:true}).strict(),
+}).strict().refine(v=>!!v.clientId!==!!v.newClient,'Выберите клиента или заполните нового')
+ .refine(v=>![v.newClient?.name??'',v.newClient?.phone??'',v.order.title,...v.order.items.map(i=>i.description)].some(s=>/[\u0000-\u001f\u007f\ud800-\udfff]/u.test(s))&&!invalidMessageControl.test(v.order.notes));
+export type MessageOrderInput=z.infer<typeof messageOrderSchema>;
+export interface MessagePreview {
+ title:string;clientName:string;phone:string;amount:string;dueDate:string;notes:string;
+ warnings:('CLIENT_REQUIRED'|'AMOUNT_REQUIRED'|'AMOUNT_AMBIGUOUS'|'DATE_AMBIGUOUS'|'TITLE_REQUIRED'|'UNSUPPORTED_CURRENCY')[];
+ referenceDate:string;
+ matches:{id:string;name:string;phone:string}[];
+}
+export const passportTokenSchema=z.object({token:z.string().regex(/^[a-f0-9]{64}$/)}).strict();
+export const passportConfirmSchema=passportTokenSchema.extend({orderVersion:z.number().int().positive(),revision:z.number().int().positive()}).strict();
+export const passportPhotoSchema=z.object({
+ image:z.string().min(4).max(400000).regex(/^[A-Za-z0-9+/]+={0,2}$/),
+ phase:z.enum(['BEFORE','AFTER']),shared:z.boolean(),idempotencyKey:z.uuid().transform(v=>v.toLowerCase()),
+}).strict();
+export type PassportPhotoInput=z.infer<typeof passportPhotoSchema>;
+export interface PassportPhoto {id:string;phase:'BEFORE'|'AFTER';shared:boolean;image:string;canDelete?:boolean}
+export interface OrderPassport {
+ companyName:string;number:number;title:string;status:Stage;dueDate:string|null;
+ orderVersion:number;revision:number;expiresAt:string|null;active:boolean;confirmedAt:string|null;
+ photos:PassportPhoto[];
+ canPublish?:boolean;
+}
+export interface PassportLinkResult {url:string;qr:string;expiresAt:string}

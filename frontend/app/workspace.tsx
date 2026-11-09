@@ -1,5 +1,6 @@
 'use client';
 import {PrivacyRequests} from '../features/privacy-requests';
+import {MessageOrder} from '../features/message-order';
 import { useI18n, LanguageSwitcher } from '../i18n/provider';
 
 import { useCallback, useEffect, useState } from 'react';
@@ -42,6 +43,7 @@ const navigation = [
   const [data, setData] = useState(emptyData);
   const [section, setSection] = useState<Section>('overview');
   const [modal, setModal] = useState<Modal | null>(null);
+  const [messageOpen,setMessageOpen]=useState(false);
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
 
@@ -95,6 +97,7 @@ const navigation = [
       {error && <div className="alert" role="alert">{t(error)}<button onClick={() => refresh().catch(e => setError(e.message))}>{t("Обновить")}</button></div>}
       <div className="page-heading"><div><p className="eyebrow">{section === 'overview' ? day : t("{0} / РАБОЧЕЕ ПРОСТРАНСТВО", user.organization.name)}</p><h1>{section === 'overview' ? t("Всё под контролем.") : selectedNav.label}</h1><p className="page-subtitle">{({ overview: t("Ваш бизнес в деталях. Главное — на одном экране."), clients: t("Люди и компании, с которыми вы работаете."), orders: t("От первого обращения до выполненной работы."), finances: t("Поступления и расходы без потерянных деталей."), documents: t("Документы, связанные с вашими заказами."), tasks:t('Договорённости, исполнители и сроки в одном месте.'),team:t('Люди, с которыми вы строите бизнес.'),history:t('Кто и когда изменил данные'), settings:t("Данные компании для вашего пространства и документов.") })[section]}</p></div>
       {!['settings','history','tasks','team'].includes(section) && <div className="heading-actions">{section==='documents'&&<button className="button secondary" onClick={()=>setModal({kind:'invoice'})}><Plus size={17}/>{t('Создать счёт')}</button>}{section === 'finances' && <button className="button secondary" onClick={() => setModal({ kind: 'payment' })}><Plus size={17} />{t("Оплата")}</button>}<button className="button primary" onClick={() => setModal({ kind: section === 'clients' ? 'client' : section === 'finances' ? 'expense' : section === 'documents' ? 'document' : 'order' })}><Plus size={18} />{section === 'clients' ? t("Новый клиент") : section === 'finances' ? t("Добавить расход") : section === 'documents' ? t("Создать акт") : t("Новый заказ")}</button></div>}</div>
+      {['overview','orders'].includes(section)&&<button className="message-launch" onClick={()=>setMessageOpen(true)}><span><strong>{t('Из сообщения в заказ')}</strong><small>{t('Вставьте обращение и проверьте готовые поля')}</small></span><ArrowRight size={24}/></button>}
       {section === 'overview' && dashboard && <>
         {dashboard.clientsCount===0&&<GettingStarted onClient={()=>setModal({kind:'client'})} onSettings={()=>navigate('settings')} onTeam={()=>navigate('team')}/>}
         <div className="section-meta"><span><span className="live-dot" />{t("Сводка бизнеса")}</span><span>{t("За всё время · KZT")}</span></div>
@@ -121,5 +124,6 @@ const navigation = [
     </main></div>
     {toast && <div className="toast" role="status"><CheckCircle2 size={19} />{t(toast)}</div>}
     {modal && <Editor key={`${modal.kind}-${modal.order?.id ?? modal.client?.id ?? ''}`} modal={modal} close={() => setModal(null)} saved={saved} setModal={setModal} />}
+    {messageOpen&&<MessageOrder close={()=>setMessageOpen(false)} created={async id=>{setMessageOpen(false);setToast(t('Заказ создан'));try{await refresh();await openOrder({id});}catch(e){setError((e as Error).message);}}}/>}
   </div>;
 }

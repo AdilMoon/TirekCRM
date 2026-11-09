@@ -143,6 +143,9 @@ model Order {
   expenses       Expense[]
   documents      Document[]
   tasks          BusinessTask[]
+  intakeReceipt  MessageOrderReceipt?
+  passport       OrderPassport?
+  photos         OrderPhoto[]
   @@unique([organizationId, number])
   @@unique([id, organizationId])
   @@index([organizationId, status, createdAt])
@@ -377,4 +380,45 @@ model ExpenseReversal {
  @@unique([replacementExpenseId,organizationId])
  @@unique([organizationId,idempotencyKey])
  @@index([organizationId,createdAt,id])
+}
+
+model MessageOrderReceipt {
+ id String @id @default(uuid()) @db.Uuid
+ organizationId String @db.Uuid
+ idempotencyKey String @db.Uuid
+ inputHash String @db.VarChar(64)
+ actorId String @db.Uuid
+ orderId String @unique @db.Uuid
+ order Order @relation(fields:[orderId,organizationId],references:[id,organizationId],onDelete:Cascade)
+ createdAt DateTime @default(now())
+ @@unique([organizationId,idempotencyKey])
+ @@unique([orderId,organizationId])
+}
+model OrderPassport {
+ orderId String @id @db.Uuid
+ organizationId String @db.Uuid
+ order Order @relation(fields:[orderId,organizationId],references:[id,organizationId],onDelete:Cascade)
+ tokenHash String @unique @db.VarChar(64)
+ expiresAt DateTime
+ revokedAt DateTime?
+ revision Int @default(1)
+ confirmedAt DateTime?
+ confirmedOrderVersion Int?
+ confirmedRevision Int?
+ @@unique([orderId,organizationId])
+}
+model OrderPhoto {
+ id String @id @default(uuid()) @db.Uuid
+ orderId String @db.Uuid
+ organizationId String @db.Uuid
+ createdById String @db.Uuid
+ order Order @relation(fields:[orderId,organizationId],references:[id,organizationId],onDelete:Cascade)
+ phase String @db.VarChar(6)
+ shared Boolean @default(false)
+ image Bytes
+ inputHash String @db.VarChar(64)
+ idempotencyKey String @db.Uuid
+ createdAt DateTime @default(now())
+ @@unique([orderId,idempotencyKey])
+ @@index([orderId,organizationId,createdAt,id])
 }

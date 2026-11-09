@@ -9,6 +9,7 @@ import { Pagination } from '../components/pagination';
 import { Empty, Field, ModalShell, SearchBox } from '../components/ui';
 import type { TeamData } from './team';
 import { TaskDiscussion } from './task-discussion';
+import { OrderPassportManager } from './order-passport';
 function OrderPicker({initial}:{initial:BusinessTask['order']}) {
  const {t}=useI18n();const [q,setQ]=useState(''),[page,setPage]=useState(1),[selected,setSelected]=useState(initial);
  const {result,busy,error,retry}=usePage<Order>('/orders/search',new URLSearchParams({q,page:String(page)}).toString());
@@ -37,6 +38,7 @@ function TaskEditor({task,user,close,saved}:{task:BusinessTask|null;user:Session
 export function Tasks({user,onSessionExpired}:{user:SessionUser;onSessionExpired?:()=>void}) {
  const {t,dateLabel}=useI18n();const owner=user.role==='OWNER';
  const [discussion,setDiscussion]=useState<BusinessTask|null>(null);
+ const [passportId,setPassportId]=useState('');
  const [q,setQ]=useState(''),[page,setPage]=useState(1),[status,setStatus]=useState(''),[mine,setMine]=useState(false),[editor,setEditor]=useState<BusinessTask|null|undefined>(undefined),[busyId,setBusyId]=useState(''),[actionError,setActionError]=useState(''),[notice,setNotice]=useState('');
  const {result,error,errorStatus,busy,retry}=usePage<BusinessTask>('/tasks',new URLSearchParams({q,page:String(page),...(status?{status}:{}),...(mine?{assigneeId:user.id}:{})}).toString());
  useEffect(()=>{if(errorStatus===401)onSessionExpired?.();},[errorStatus,onSessionExpired]);
@@ -50,13 +52,14 @@ export function Tasks({user,onSessionExpired}:{user:SessionUser;onSessionExpired
  <div className="task-card-head"><span className={'status '+({TODO:'new',IN_PROGRESS:'in_progress',DONE:'completed',CANCELLED:'cancelled'}[task.status])}>{t(taskStatusLabels[task.status])}</span>{owner&&<button className="icon-button" aria-label={t('Редактировать задачу')} onClick={()=>setEditor(task)}><Pencil size={16}/></button>}</div>
  <h3>{task.title}</h3>{task.description&&<p className="task-description">{task.description}</p>}
  <div className="task-meta"><span>{task.assignee.name}{!task.assignee.isActive&&' · '+t('Доступ отключён')}</span>{task.order&&<span>{t('Заказ №')} {task.order.number} · {task.order.title}</span>}<span className={late?'task-overdue':''}><Clock3 size={14}/>{task.dueDate?dateLabel(task.dueDate):t('Без срока')}{late&&' · '+t('Просрочена')}</span></div>
- <div className="task-actions"><button className="button secondary" onClick={()=>setDiscussion(task)}><MessageSquare size={16}/>{t('Обсуждение')}</button>{owner?<label>{t('Изменить статус')}<select disabled={!!busyId} value={task.status} onChange={e=>change(task,e.target.value as TaskStatus)}>{taskStatuses.map(s=><option key={s} value={s}>{t(taskStatusLabels[s])}</option>)}</select></label>:<>
+ <div className="task-actions">{task.order&&['TODO','IN_PROGRESS'].includes(task.status)&&<button className="button secondary" onClick={()=>setPassportId(task.order!.id)}>{t('QR-паспорт заказа')}</button>}<button className="button secondary" onClick={()=>setDiscussion(task)}><MessageSquare size={16}/>{t('Обсуждение')}</button>{owner?<label>{t('Изменить статус')}<select disabled={!!busyId} value={task.status} onChange={e=>change(task,e.target.value as TaskStatus)}>{taskStatuses.map(s=><option key={s} value={s}>{t(taskStatusLabels[s])}</option>)}</select></label>:<>
  {task.status==='TODO'&&<button className="button primary" disabled={!!busyId} onClick={()=>change(task,'IN_PROGRESS')}>{t('Начать задачу')}</button>}
  {task.status==='IN_PROGRESS'&&<><button className="button primary" disabled={!!busyId} onClick={()=>change(task,'DONE')}>{t('Завершить задачу')}</button><button className="button secondary" disabled={!!busyId} onClick={()=>change(task,'TODO')}>{t('Вернуть в план')}</button></>}</>}</div>
  </article>;})}</div>
  {busy&&<Empty>{t('Загрузка…')}</Empty>}{!busy&&!error&&!result?.items.length&&<Empty>{t('Задач пока нет. Здесь появятся назначенные поручения.')}</Empty>}
  <Pagination result={result} busy={busy} page={page} setPage={setPage}/>
  {discussion&&<TaskDiscussion key={discussion.id} task={discussion} close={()=>setDiscussion(null)} onSessionExpired={onSessionExpired}/>}
+ {passportId&&<OrderPassportManager id={passportId} close={()=>{setPassportId('');retry();}}/>}
  {editor!==undefined&&<TaskEditor user={user} task={editor} close={()=>setEditor(undefined)} saved={()=>{setEditor(undefined);setNotice('Задача сохранена');retry();}}/>}
  </section>;
 }

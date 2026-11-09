@@ -8,6 +8,8 @@ import { AuditService, Actor } from '../audit/audit.service';
 import { clientRequisites,organizationRequisites } from '../documents/snapshot';
 import { serializable } from '../../common/transaction';
 import { cents, money, totalForItems } from '../../common/money';
+import {releaseBooking} from '../scheduling/booking-writer';
+import {almatyTime} from '../scheduling/planner';
 
 export const orderInclude = { client: true, items: true, ...paymentsWithRefunds } satisfies Prisma.OrderInclude;
 type FullOrder = Prisma.OrderGetPayload<{ include: typeof orderInclude }>;
@@ -74,6 +76,8 @@ export class CrmService {
       if(!previous)throw new NotFoundException('Заказ не найден');
       if(previous.version!==input.version)throw new ConflictException('Заказ уже изменён. Откройте его заново');
       if(['COMPLETED','CANCELLED'].includes(previous.status))throw new ConflictException('Завершённый или отменённый заказ нельзя редактировать');
+      const booking=await tx.workBooking.findFirst({where:{orderId:id,organizationId:org,releasedAt:null}});
+      if(booking&&input.dueDate&&almatyTime(booking.startsAt).day>input.dueDate)throw new ConflictException('Срок раньше назначенной работы. Сначала перенесите назначение');
       if(previous.payments.length && previous.clientId!==input.clientId)throw new ConflictException('Нельзя менять клиента после получения оплаты');
       if(!await tx.client.findFirst({where:{id:input.clientId,organizationId:org}}))throw new NotFoundException('Клиент не найден');
       const total=totalForItems(input.items);
@@ -121,6 +125,10 @@ export class CrmService {
       if (!transitions[order.status].includes(status)) throw new ConflictException('Этот переход статуса недоступен');
       if (status === 'CANCELLED' && paidCents(order.payments)>0n) throw new ConflictException('Для отмены заказа сначала верните оставшуюся оплату');
       const updated=await tx.order.update({where:{id},data:{status,version:{increment:1}},include:orderInclude});
+      if(status==='COMPLETED'||status==='CANCELLED'){
+       const booking=await tx.workBooking.findFirst({where:{orderId:id,organizationId:org,releasedAt:null}});
+       if(booking)await releaseBooking(tx,this.audit,actor,booking,status==='COMPLETED');
+      }
       await this.audit.record(tx,actor,'ORDER',id,'ORDER_STATUS_CHANGED',{number:order.number,from:order.status,to:status});
       return serializeOrder(updated);
     });

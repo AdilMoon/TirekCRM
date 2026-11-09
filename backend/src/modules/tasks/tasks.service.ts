@@ -9,6 +9,7 @@ import { publishTaskNotification,removeFormerAssigneeNotifications } from '../no
 type Actor=AuthRequest['user'];
 // Deliberately select only operational fields: employees never receive financial or client data.
 const taskSelect={id:true,title:true,description:true,status:true,version:true,dueDate:true,createdAt:true,updatedAt:true,
+ booking:{select:{startsAt:true,endsAt:true,releasedAt:true}},
  assignee:{select:{id:true,name:true,isActive:true}},order:{select:{id:true,number:true,title:true}}} as const;
 @Injectable()
 export class TasksService {
@@ -49,6 +50,8 @@ export class TasksService {
    const previous=await tx.businessTask.findFirst({where:{id,organizationId:actor.organizationId}});
    if(!previous)throw new NotFoundException('Задача не найдена');
    if(previous.version!==input.version)throw new ConflictException('Задача уже изменена. Обновите список');
+   const booking=await tx.workBooking.findFirst({where:{taskId:id,organizationId:actor.organizationId,releasedAt:null}});
+   if(booking&&(input.assigneeId!==booking.employeeId||input.orderId!==booking.orderId))throw new ConflictException('Измените исполнителя через распределение заказа');
    await this.references(tx,actor.organizationId,input);
    const task=await tx.businessTask.update({where:{id},data:{...input,version:{increment:1},dueDate:input.dueDate?new Date(input.dueDate+'T00:00:00Z'):null},select:taskSelect});
    await this.audit.record(tx,actor,'TASK',id,'TASK_UPDATED',{title:task.title,assignee:task.assignee.name});
@@ -70,6 +73,8 @@ export class TasksService {
    const employeeTransitions:Record<TaskStatus,TaskStatus[]>={TODO:['IN_PROGRESS'],IN_PROGRESS:['TODO','DONE'],DONE:[],CANCELLED:[]};
    if(actor.role==='EMPLOYEE'&&!employeeTransitions[previous.status].includes(status))throw new ForbiddenException('Этот переход задачи недоступен');
    if(previous.status===status)return tx.businessTask.findUniqueOrThrow({where:{id},select:taskSelect});
+   if(status==='CANCELLED'&&await tx.workBooking.findFirst({where:{taskId:id,organizationId:actor.organizationId,releasedAt:null}}))throw new ConflictException('Сначала отмените назначение в карточке заказа');
+   if(['TODO','IN_PROGRESS'].includes(status)&&await tx.workBooking.findFirst({where:{taskId:id,releasedAt:{not:null}}}))throw new ConflictException('Освобождённое назначение нельзя вернуть через задачу');
    const task=await tx.businessTask.update({where:{id},data:{status,version:{increment:1}},select:taskSelect});
    await this.audit.record(tx,actor,'TASK',id,'TASK_STATUS_CHANGED',{title:task.title,from:previous.status,to:status});
    await publishTaskNotification(tx,{organizationId:actor.organizationId,taskId:id,actorId:actor.id,actorName:actor.name,kind:'TASK_STATUS_CHANGED',eventKey:'task:'+id+':status:'+task.version});

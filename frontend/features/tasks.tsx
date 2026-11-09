@@ -36,7 +36,7 @@ function TaskEditor({task,user,close,saved}:{task:BusinessTask|null;user:Session
  <div className="form-actions"><button type="button" className="button secondary" disabled={busy} onClick={close}>{t('Отмена')}</button><button className="button primary" disabled={busy||!team}>{t('Сохранить')}</button></div></form></ModalShell>;
 }
 export function Tasks({user,onSessionExpired}:{user:SessionUser;onSessionExpired?:()=>void}) {
- const {t,dateLabel}=useI18n();const owner=user.role==='OWNER';
+ const {t,dateLabel,formatDate}=useI18n();const owner=user.role==='OWNER';
  const [discussion,setDiscussion]=useState<BusinessTask|null>(null);
  const [passportId,setPassportId]=useState('');
  const [q,setQ]=useState(''),[page,setPage]=useState(1),[status,setStatus]=useState(''),[mine,setMine]=useState(false),[editor,setEditor]=useState<BusinessTask|null|undefined>(undefined),[busyId,setBusyId]=useState(''),[actionError,setActionError]=useState(''),[notice,setNotice]=useState('');
@@ -52,6 +52,7 @@ export function Tasks({user,onSessionExpired}:{user:SessionUser;onSessionExpired
  <div className="task-card-head"><span className={'status '+({TODO:'new',IN_PROGRESS:'in_progress',DONE:'completed',CANCELLED:'cancelled'}[task.status])}>{t(taskStatusLabels[task.status])}</span>{owner&&<button className="icon-button" aria-label={t('Редактировать задачу')} onClick={()=>setEditor(task)}><Pencil size={16}/></button>}</div>
  <h3>{task.title}</h3>{task.description&&<p className="task-description">{task.description}</p>}
  <div className="task-meta"><span>{task.assignee.name}{!task.assignee.isActive&&' · '+t('Доступ отключён')}</span>{task.order&&<span>{t('Заказ №')} {task.order.number} · {task.order.title}</span>}<span className={late?'task-overdue':''}><Clock3 size={14}/>{task.dueDate?dateLabel(task.dueDate):t('Без срока')}{late&&' · '+t('Просрочена')}</span></div>
+ {task.booking&&!task.booking.releasedAt&&<p className="schedule-time">{t('Работа по графику: {0} — {1}',formatDate(task.booking.startsAt,{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}),formatDate(task.booking.endsAt,{hour:'2-digit',minute:'2-digit'}))}</p>}
  <div className="task-actions">{task.order&&['TODO','IN_PROGRESS'].includes(task.status)&&<button className="button secondary" onClick={()=>setPassportId(task.order!.id)}>{t('QR-паспорт заказа')}</button>}<button className="button secondary" onClick={()=>setDiscussion(task)}><MessageSquare size={16}/>{t('Обсуждение')}</button>{owner?<label>{t('Изменить статус')}<select disabled={!!busyId} value={task.status} onChange={e=>change(task,e.target.value as TaskStatus)}>{taskStatuses.map(s=><option key={s} value={s}>{t(taskStatusLabels[s])}</option>)}</select></label>:<>
  {task.status==='TODO'&&<button className="button primary" disabled={!!busyId} onClick={()=>change(task,'IN_PROGRESS')}>{t('Начать задачу')}</button>}
  {task.status==='IN_PROGRESS'&&<><button className="button primary" disabled={!!busyId} onClick={()=>change(task,'DONE')}>{t('Завершить задачу')}</button><button className="button secondary" disabled={!!busyId} onClick={()=>change(task,'TODO')}>{t('Вернуть в план')}</button></>}</>}</div>

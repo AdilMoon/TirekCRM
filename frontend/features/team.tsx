@@ -5,8 +5,10 @@ import { roleLabels, type TeamMember, type TeamInvitation } from '@tirek/contrac
 import { api } from '../lib/api';
 import { useI18n } from '../i18n/provider';
 import { ModalShell, Field, Empty } from '../components/ui';
+import {WorkProfiles} from './work-profiles';
 export type TeamData={members:TeamMember[];invitations:TeamInvitation[]};
 export function Team() {
+ const [profiles,setProfiles]=useState(false);
  const {t,formatDate}=useI18n();
  const [data,setData]=useState<TeamData|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),[invite,setInvite]=useState(false),[link,setLink]=useState(''),[copied,setCopied]=useState(false),[target,setTarget]=useState<TeamMember|null>(null);
  async function load(){try{setData(await api<TeamData>('/team'));setError('');}catch(e){setError((e as Error).message);}}
@@ -19,9 +21,10 @@ export function Team() {
  async function changeAccess(){if(!target)return;setBusy(true);setError('');try{await api('/team/members/'+target.id,{method:'PATCH',body:JSON.stringify({isActive:!target.isActive,version:target.version})});setTarget(null);await load();}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
  async function revoke(id:string){setBusy(true);try{await api('/team/invitations/'+id+'/revoke',{method:'POST'});await load();}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
  return <div className="team-space">
+  {profiles&&<WorkProfiles close={()=>setProfiles(false)}/>}
   <div className="info-banner"><Users size={23}/><div><strong>{t('Каждому — своя зона ответственности')}</strong><p>{t('Владелец управляет бизнесом. Сотрудники видят свои задачи и отмечают выполнение.')}</p></div></div>
   {error&&!invite&&!target&&<div className="alert" role="alert">{t(error)}<button onClick={load}>{t('Обновить')}</button></div>}
-  <section className="panel"><div className="panel-heading"><h2>{t('Сотрудники')}</h2><button className="button primary" onClick={()=>{setError('');setLink('');setInvite(true);}}><Plus size={17}/>{t('Пригласить сотрудника')}</button></div>
+  <section className="panel"><div className="panel-heading"><h2>{t('Сотрудники')}</h2><div className="team-schedule-actions"><button className="button secondary" onClick={()=>setProfiles(true)}>{t('Навыки и график')}</button><button className="button primary" onClick={()=>{setError('');setLink('');setInvite(true);}}><Plus size={17}/>{t('Пригласить сотрудника')}</button></div></div>
   <div className="table-wrap"><table><thead><tr><th>{t('Имя')}</th><th>Email</th><th>{t('Роль')}</th><th>{t('Доступ')}</th><th/></tr></thead><tbody>{data?.members.map(member=><tr key={member.id}><td><strong>{member.name}</strong></td><td>{member.email}</td><td>{t(roleLabels[member.role])}</td><td><span className={'status '+(member.isActive?'completed':'cancelled')}>{t(member.isActive?'Активен':'Отключён')}</span></td><td>{member.role==='EMPLOYEE'&&<button className="text-button" disabled={busy} onClick={()=>{setTarget(member);setError('');}}>{t(member.isActive?'Отключить доступ':'Вернуть доступ')}</button>}</td></tr>)}</tbody></table></div>
   {!data&&!error&&<Empty>{t('Загрузка…')}</Empty>}</section>
   <section className="panel"><div className="panel-heading"><div><h2>{t('Ожидают приглашения')}</h2><p>{t('Ссылка действует 48 часов и используется один раз.')}</p></div></div>

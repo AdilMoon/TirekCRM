@@ -16,6 +16,7 @@
 | backend/src/modules/finance | Возвраты, сторнирования и общий SQL-источник финансовых движений |
 | backend/src/modules/reports | Фильтры, объединённый финансовый отчёт и поиск документов |
 | backend/src/modules/tasks | Назначения, сроки, версии и разрешённые переходы |
+| backend/src/modules/scheduling | Рабочие профили, объяснимый подбор, временные резервы и атомарная связь с задачами/заказами |
 | backend/src/modules/notifications | Запись уведомлений внутри транзакции события, личный список, счётчик и прочтение |
 | backend/src/modules/audit | AuditWriterModule: запись событий без зависимости от AuthModule; AuditModule: защищённое чтение истории |
 | backend/src/database | Подключение PostgreSQL через Prisma |

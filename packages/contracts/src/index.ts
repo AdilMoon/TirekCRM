@@ -124,6 +124,7 @@ export type TaskQuery = z.infer<typeof taskQuerySchema>;
 export interface TeamMember { id:string;name:string;email:string;role:UserRole;isActive:boolean;version:number }
 export interface TeamInvitation {id:string;name:string;email:string;expiresAt:string;acceptedAt:string|null;revokedAt:string|null;createdAt:string}
 export interface BusinessTask {
+ booking?:{startsAt:string;endsAt:string;releasedAt:string|null}|null;
  id:string;title:string;description:string;status:TaskStatus;version:number;dueDate:string|null;createdAt:string;updatedAt:string;
  assignee:{id:string;name:string;isActive:boolean};order:{id:string;number:number;title:string}|null;
 }
@@ -283,3 +284,30 @@ export interface OrderPassport {
  canPublish?:boolean;
 }
 export interface PassportLinkResult {url:string;qr:string;expiresAt:string}
+
+const skill=z.string().trim().toLowerCase().min(1).max(40).refine(v=>!/[\u0000-\u001f\u007f\ud800-\udfff]/u.test(v));
+export const schedulingSkillsSchema=z.array(skill).max(20).refine(v=>new Set(v).size===v.length);
+export const workProfileSchema=z.object({
+ skills:schedulingSkillsSchema,weekdays:z.array(z.number().int().min(1).max(7)).max(7).refine(v=>new Set(v).size===v.length),
+ startMinute:z.number().int().min(0).max(1425).multipleOf(15),endMinute:z.number().int().min(15).max(1440).multipleOf(15),
+ version:z.number().int().min(0).max(2147483646),
+}).strict().refine(v=>v.endMinute>v.startMinute);
+export const assignmentSlotSchema=z.object({
+ startsAt:z.iso.datetime({offset:true}).refine(v=>Date.parse(v)%900000===0),
+ durationMinutes:z.number().int().min(15).max(720).multipleOf(15),requiredSkills:schedulingSkillsSchema,
+}).strict();
+export const assignOrderSchema=assignmentSlotSchema.extend({
+ employeeId:z.uuid().transform(v=>v.toLowerCase()),profileVersion:z.number().int().positive(),orderVersion:z.number().int().positive(),
+ currentBookingId:z.uuid().nullable(),idempotencyKey:z.uuid().transform(v=>v.toLowerCase()),
+}).strict();
+export const cancelAssignmentSchema=z.object({bookingId:z.uuid()}).strict();
+export type WorkProfileInput=z.infer<typeof workProfileSchema>;
+export type AssignmentSlot=z.infer<typeof assignmentSlotSchema>;
+export type AssignOrderInput=z.infer<typeof assignOrderSchema>;
+export interface WorkProfile {skills:string[];weekdays:number[];startMinute:number;endMinute:number;version:number}
+export interface SchedulingMember {id:string;name:string;isActive:boolean;profile:WorkProfile|null}
+export interface Booking {id:string;employeeId:string;employee:{name:string};startsAt:string;endsAt:string;requiredSkills:string[];taskId:string;releasedAt:string|null}
+export interface AssignmentState {orderVersion:number;status:Stage;current:Booking|null}
+export type CandidateBlock='INACTIVE'|'PROFILE_REQUIRED'|'MISSING_SKILLS'|'OUTSIDE_HOURS'|'OVERLAP';
+export interface AssignmentCandidate {id:string;name:string;profileVersion:number|null;eligible:boolean;blocks:CandidateBlock[];missingSkills:string[];workloadMinutes:number;activeTasks:number}
+export interface AssignmentRecommendations {orderVersion:number;currentBookingId:string|null;startsAt:string;endsAt:string;recommendedId:string|null;candidates:AssignmentCandidate[]}

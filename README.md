@@ -20,7 +20,7 @@ npm run dev:https
 ```
 Сайт: https://localhost:8443. [Локальный TLS, доверие сертификату и проверки](docs/https.md).
 Демо-вход после seed: owner@tirek.local; начальный пароль TirekDemo2026! (см. .env).
-На текущем компьютере база и зависимости уже настроены. Seed не очищает данные.
+На текущем компьютере используется установленный PostgreSQL 17: `127.0.0.1:5432`, база `tirek`, пользователь `tirek`. Служба Windows запускается автоматически; `npm run db:local` здесь не нужен. Для обычного запуска достаточно `npm run dev:https`. Существующие данные перенесены. [Подключение и резервные копии](docs/local-postgresql.md). Seed не очищает данные.
 
 Можно также создать пустую компанию через [форму регистрации](https://localhost:8443/register). В production она по умолчанию закрыта; конфигурация и ограничения описаны в [company-onboarding.md](docs/company-onboarding.md).
 
@@ -45,6 +45,7 @@ TirekCRM/
 ## Документация
 - [Функциональные блоки продукта — Word-отчет](docs/reports/functional-blocks-2026-10-24.docx), [текстовый исходник](docs/reports/functional-blocks-2026-10-24.md)
 - [Запуск и проверки](docs/development.md)
+- [Установленный PostgreSQL на порту 5432](docs/local-postgresql.md)
 - [Архитектура и правила размещения файлов](docs/architecture.md)
 - [API, поиск и защита изменений](docs/backend-api.md)
 - [Команда, права, приглашения и задачи](docs/team-and-tasks.md)

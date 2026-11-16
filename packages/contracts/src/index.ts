@@ -1,5 +1,6 @@
 import { z } from 'zod';
 export * from './work-time';
+export * from './order-quotes';
 
 export const stages = ['NEW', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'] as const;
 export type Stage = typeof stages[number];
@@ -182,7 +183,7 @@ export const notificationQuerySchema=listQuerySchema.omit({q:true}).extend({unre
 export const readNotificationsSchema=z.object({ids:z.array(z.uuid().transform(value=>value.toLowerCase())).min(1).max(100).refine(ids=>new Set(ids).size===ids.length)}).strict();
 export type NotificationQuery=z.infer<typeof notificationQuerySchema>;
 export interface AppNotification {
- id:string;kind:'TASK_ASSIGNED'|'TASK_STATUS_CHANGED'|'TASK_COMMENT_ADDED';actorName:string;taskStatus:TaskStatus|null;
+ id:string;kind:'TASK_ASSIGNED'|'TASK_STATUS_CHANGED'|'TASK_COMMENT_ADDED'|'ORDER_QUOTE_ACCEPTED';actorName:string;taskStatus:TaskStatus|null;
  task:{id:string;title:string};createdAt:string;readAt:string|null;
 }
 export interface NotificationPage extends PageResult<AppNotification> {unreadCount:number}

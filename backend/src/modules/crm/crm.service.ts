@@ -8,6 +8,7 @@ import { AuditService, Actor } from '../audit/audit.service';
 import { clientRequisites,organizationRequisites } from '../documents/snapshot';
 import { serializable } from '../../common/transaction';
 import { cents, money, totalForItems } from '../../common/money';
+import { orderTermsHash } from '../../common/order-terms';
 import {releaseBooking} from '../scheduling/booking-writer';
 import {almatyTime} from '../scheduling/planner';
 
@@ -82,6 +83,13 @@ export class CrmService {
       if(!await tx.client.findFirst({where:{id:input.clientId,organizationId:org}}))throw new NotFoundException('Клиент не найден');
       const total=totalForItems(input.items);
       if(cents(total)>999999999999999999n)throw new ConflictException('Сумма заказа слишком велика');
+      const previousTerms = orderTermsHash({
+        ...previous, total: amount(previous.total),
+        items: previous.items.map(line => ({ ...line, unitPrice: amount(line.unitPrice) })),
+      });
+      if (previousTerms !== orderTermsHash({ ...input, total }) && await tx.orderQuote.findFirst({
+        where: { orderId: id, organizationId: org, kind: 'BASE', acceptedAt: { not: null } }, select: { id: true },
+      })) throw new ConflictException('Согласованные условия заказа меняются через допработы');
       const paid=paidCents(previous.payments);
       if(cents(total)<paid)throw new ConflictException('Сумма заказа не может быть меньше полученной оплаты');
       const order=await tx.order.update({where:{id},data:{
@@ -123,6 +131,10 @@ export class CrmService {
       if (!order) throw new NotFoundException('Заказ не найден');
       if (order.status === status) return serializeOrder(order);
       if (!transitions[order.status].includes(status)) throw new ConflictException('Этот переход статуса недоступен');
+      if (order.status === 'NEW' && status === 'CONFIRMED' && await tx.orderQuote.findFirst({
+        where: { orderId: id, organizationId: org, kind: 'BASE', acceptedAt: null, revokedAt: null, expiresAt: { gt: new Date() } },
+        select: { id: true },
+      })) throw new ConflictException('Ожидается согласование сметы по ссылке');
       if (status === 'CANCELLED' && paidCents(order.payments)>0n) throw new ConflictException('Для отмены заказа сначала верните оставшуюся оплату');
       const updated=await tx.order.update({where:{id},data:{status,version:{increment:1}},include:orderInclude});
       if(status==='COMPLETED'||status==='CANCELLED'){

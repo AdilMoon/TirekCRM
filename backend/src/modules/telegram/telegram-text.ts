@@ -1,5 +1,8 @@
 import type {TelegramLocale} from './telegram.service';
 const words={
+ baseApproved:['Клиент согласовал смету','Клиент сметаны мақұлдады','The client approved the estimate'],
+ extraApproved:['Клиент согласовал допработы','Клиент қосымша жұмысты мақұлдады','The client approved the extra work'],
+ orderNo:['Заказ №','Тапсырыс №','Order #'],
  startWork:['Начать работу','Жұмысты бастау','Start work'],finishTask:['Завершить задачу','Тапсырманы аяқтау','Complete task'],
  todo:['Статус: к выполнению','Күйі: орындау керек','Status: to do'],inProgress:['Статус: в работе','Күйі: орындалуда','Status: in progress'],done:['Статус: готово','Күйі: дайын','Status: done'],cancelledTask:['Статус: отменена','Күйі: тоқтатылған','Status: cancelled'],
  photoBeforeDone:['Сначала отправьте фото результата. После завершения задачи загрузка фото будет недоступна.','Алдымен нәтиже фотосын жіберіңіз. Тапсырма аяқталғаннан кейін фото жүктеу қолжетімсіз болады.','Send result photos first. Photo upload is unavailable after task completion.'],

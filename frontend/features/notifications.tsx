@@ -11,6 +11,7 @@ import { TaskDiscussion } from './task-discussion';
 
 const labels:Record<AppNotification['kind'],string>={
  TASK_ASSIGNED:'Вам назначена задача',TASK_STATUS_CHANGED:'Изменён статус задачи',TASK_COMMENT_ADDED:'Новый комментарий к задаче',
+ ORDER_QUOTE_ACCEPTED:'Клиент согласовал предложение',
 };
 function NotificationList({revision,refresh,close,openTask,onSessionExpired}:{revision:number;refresh:()=>void;close:()=>void;openTask:(task:BusinessTask)=>void;onSessionExpired:()=>void}) {
  const {t,formatDate}=useI18n();
@@ -48,7 +49,7 @@ function NotificationList({revision,refresh,close,openTask,onSessionExpired}:{re
  <div className="notification-list" aria-busy={list.busy}>{list.result?.items.map(item=><article key={item.id} className={'notification-card'+(!item.readAt?' is-unread':'')}>
  <header><strong>{t(labels[item.kind])}</strong><span>{t(item.readAt?'Прочитано':'Не прочитано')}</span></header>
  <h3>{item.task.title}</h3>
- <p>{item.actorName} · <time dateTime={item.createdAt}>{formatDate(item.createdAt,{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}</time></p>
+ <p>{t(item.actorName)} · <time dateTime={item.createdAt}>{formatDate(item.createdAt,{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}</time></p>
  {item.taskStatus&&<p>{t('Статус')}: {t(taskStatusLabels[item.taskStatus])}</p>}
  <div className="notification-actions">
  <button className="button secondary" disabled={busy} onClick={()=>act([item.id],item.task.id)}><MessageSquare size={15}/>{t('Открыть обсуждение')}</button>

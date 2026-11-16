@@ -1,4 +1,5 @@
-import {Injectable,HttpException} from '@nestjs/common';
+import {Injectable,HttpException,NotFoundException} from '@nestjs/common';
+import type {QuoteSnapshot} from '@tirek/contracts';
 import {z} from 'zod';
 import {Database} from '../../database/database.service';
 import {PassportService} from '../smart-orders/passport.service';
@@ -25,6 +26,24 @@ export class TelegramProcessor {
   if(task.description)text+='\n\n'+task.description.slice(0,1500);
   if(task.status==='IN_PROGRESS'&&task.orderId)text+='\n\n'+tgText(locale,'photoBeforeDone');
   return this.transport.send(link.telegramUserId,text,[...(active?[[{text:tgText(locale,task.status==='TODO'?'startWork':'finishTask'),callback_data:(task.status==='TODO'?'start:':'done:')+task.id+':'+task.version}]]:[]),...(active&&task.orderId?[[{text:tgText(locale,'photo'),callback_data:'photo:'+task.id}]]:[]),[{text:tgText(locale,'tasks'),callback_data:'list:1'}]]);
+ }
+ async quoteApproved(linkId:string,taskId:string,quoteId:string){
+  const {link,task}=await this.service.task(linkId,taskId);
+  if(!task.orderId)throw new NotFoundException('Задача не найдена');
+  const quote=await this.db.client.orderQuote.findFirst({
+   where:{id:quoteId,orderId:task.orderId,organizationId:link.organizationId,acceptedAt:{not:null},
+    order:{status:{in:['NEW','CONFIRMED','IN_PROGRESS']}}},
+   select:{kind:true,snapshot:true,order:{select:{number:true}}},
+  });
+  if(!quote)throw new NotFoundException('Задача не найдена');
+  const key=quote.kind==='EXTRA'?'extraApproved':'baseApproved';
+  let text=tgText(link.locale,key)+' · '+tgText(link.locale,'orderNo')+' '+quote.order.number;
+  if(quote.kind==='EXTRA'){
+   const snapshot=quote.snapshot as unknown as QuoteSnapshot;
+   const lines=snapshot.items.map(item=>'• '+item.quantity+' × '+item.description);
+   text+='\n\n'+lines.join('\n');
+  }
+  return this.transport.send(link.telegramUserId,text,[[{text:tgText(link.locale,'open'),callback_data:'task:'+task.id}]]);
  }
  async handle(raw:unknown){
   try{return await this.process(raw);}catch(error){

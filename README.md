@@ -57,6 +57,7 @@ TirekCRM/
 - [Обсуждения задач](docs/task-discussions.md)
 - [Личные уведомления](docs/notifications.md)
 - [Из сообщения в заказ и QR-паспорт](docs/message-orders-and-passports.md)
+- [Согласование сметы и допработ по ссылке](docs/order-quotes.md)
 - [Реквизиты и счета на оплату](docs/document-workflow.md)
 - [Финансовые отчёты, CSV-экспорт и документы](docs/financial-reports.md)
 - [Создание компании и первые шаги](docs/company-onboarding.md)

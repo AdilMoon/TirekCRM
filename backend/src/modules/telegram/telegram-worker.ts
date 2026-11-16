@@ -25,9 +25,13 @@ export class TelegramWorker implements OnModuleInit,OnModuleDestroy {
    for(let i=0;i<5&&await renew();i++){
     const delivery=await this.db.client.telegramDelivery.findFirst({where:{status:'PENDING',nextAttemptAt:{lte:new Date()},link:{botId}},orderBy:[{createdAt:'asc'},{id:'asc'}],include:{link:true,notification:true}});if(!delivery)break;
     try{
-     if(delivery.notification.recipientId!==delivery.link.userId||delivery.notification.kind!=='TASK_ASSIGNED')throw new HttpException('SKIP',404);
+     const notice=delivery.notification;
+     if(notice.recipientId!==delivery.link.userId)throw new HttpException('SKIP',404);
      await this.db.client.telegramDelivery.update({where:{id:delivery.id},data:{attempts:{increment:1}}});
-     const sent=await this.processor.card(delivery.linkId,delivery.notification.taskId,true);
+     const sent=notice.kind==='ORDER_QUOTE_ACCEPTED'&&notice.orderQuoteId
+      ?await this.processor.quoteApproved(delivery.linkId,notice.taskId,notice.orderQuoteId)
+      :notice.kind==='TASK_ASSIGNED'?await this.processor.card(delivery.linkId,notice.taskId,true):null;
+     if(!sent)throw new HttpException('SKIP',404);
      await this.db.client.telegramDelivery.updateMany({where:{id:delivery.id},data:{status:'SENT',sentAt:new Date(),messageId:String(sent.message_id)}});count++;
     }catch(error){
      if(error instanceof TelegramTransportError&&error.code===403){await this.service.stop(botId,delivery.link.telegramUserId);continue;}

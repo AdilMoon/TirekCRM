@@ -202,6 +202,7 @@ model Order {
   intakeReceipt  MessageOrderReceipt?
   passport       OrderPassport?
   photos         OrderPhoto[]
+  quotes         OrderQuote[]
   @@unique([organizationId, number])
   @@unique([id, organizationId])
   @@index([organizationId, status, createdAt])
@@ -215,6 +216,29 @@ model OrderItem {
   quantity    Int
   unitPrice   Decimal @db.Decimal(18,2)
   total       Decimal @db.Decimal(18,2)
+}
+enum OrderQuoteKind {
+  BASE
+  EXTRA
+}
+model OrderQuote {
+  id String @id @default(uuid()) @db.Uuid
+  orderId String @db.Uuid
+  organizationId String @db.Uuid
+  order Order @relation(fields: [orderId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  revision Int
+  kind OrderQuoteKind
+  basisHash String @db.VarChar(64)
+  tokenHash String @unique @db.VarChar(64)
+  snapshot Json
+  createdAt DateTime
+  expiresAt DateTime
+  acceptedAt DateTime?
+  revokedAt DateTime?
+  notifications Notification[]
+
+  @@unique([id, organizationId])
+  @@unique([orderId, revision])
 }
 model Payment {
   id             String @id @default(uuid()) @db.Uuid
@@ -382,6 +406,7 @@ enum NotificationKind {
  TASK_ASSIGNED
  TASK_STATUS_CHANGED
  TASK_COMMENT_ADDED
+ ORDER_QUOTE_ACCEPTED
 }
 model Notification {
  telegramDeliveries TelegramDelivery[]
@@ -395,12 +420,15 @@ model Notification {
  eventKey       String @db.VarChar(160)
  actorName      String
  taskStatus     TaskStatus?
+  orderQuoteId   String? @db.Uuid
+  orderQuote     OrderQuote? @relation(fields:[orderQuoteId,organizationId],references:[id,organizationId],onDelete:Cascade)
  createdAt      DateTime @default(now())
  readAt         DateTime?
  @@unique([organizationId,recipientId,eventKey])
  @@unique([id,organizationId])
  @@index([organizationId,recipientId,createdAt,id])
  @@index([organizationId,recipientId,readAt])
+ @@index([orderQuoteId])
 }
 
 model TelegramPairing {

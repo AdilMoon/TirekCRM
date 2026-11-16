@@ -2,14 +2,17 @@
 
 import { useRef, useState, type FormEvent } from 'react';
 import { workTimeEntrySchema, workTimeKinds, workTimeKindLabels, type WorkTimeKind, type WorkTimeDecision, type WorkTimeEntry, type WorkTimeEntryInput, type WorkTimePerson } from '@tirek/contracts';
+import type { WorkTimeOrder, WorkTimePage } from '@tirek/contracts';
 import { Field, ModalShell } from '../components/ui';
 import { useI18n } from '../i18n/provider';
 import { api } from '../lib/api';
 import { almatyDateTime, almatyInstant } from '../lib/work-time-date';
+import { WorkTimeOrderPicker } from './work-time-order-picker';
 
-export function WorkTimeCreate({ people, employee, close, saved }: {
+export function WorkTimeCreate({ people, employee, initialOrder = null, close, saved }: {
   people?: WorkTimePerson[];
   employee: string;
+  initialOrder?: WorkTimeOrder | null;
   close: () => void;
   saved: (month: string) => void;
 }) {
@@ -18,6 +21,7 @@ export function WorkTimeCreate({ people, employee, close, saved }: {
   const [start, setStart] = useState('');
   const [end, setEnd] = useState('');
   const [kind, setKind] = useState<WorkTimeKind>('WORK');
+  const [order, setOrder] = useState(initialOrder);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const pending = useRef<WorkTimeEntryInput | null>(null);
@@ -30,6 +34,7 @@ export function WorkTimeCreate({ people, employee, close, saved }: {
       if (!pending.current) {
         const value = workTimeEntrySchema.safeParse({
           startsAt: almatyInstant(start), endsAt: almatyInstant(end), kind,
+          ...(order && kind !== 'ABSENCE' ? { orderId: order.id } : {}),
           ...(people ? { employeeId } : {}), idempotencyKey: crypto.randomUUID(),
         });
         if (!value.success) throw new Error('Интервал должен длиться от 1 минуты до 24 часов');
@@ -57,6 +62,9 @@ export function WorkTimeCreate({ people, employee, close, saved }: {
           {workTimeKinds.map(value => <option key={value} value={value}>{t(workTimeKindLabels[value])}</option>)}
         </select>
       </label>
+      {kind !== 'ABSENCE' && <WorkTimeOrderPicker value={order} disabled={busy} onChange={value => {
+        setOrder(value); pending.current = null;
+      }}/>}
       <Field label={t('Фактическое начало (Алматы)')} type="datetime-local" required step={60} max={almatyDateTime(new Date())}
         value={start} disabled={busy} onChange={event => { setStart(event.target.value); pending.current = null; }}/>
       <Field label={t('Фактическое окончание (Алматы)')} type="datetime-local" required step={60} max={almatyDateTime(new Date())}
@@ -66,6 +74,46 @@ export function WorkTimeCreate({ people, employee, close, saved }: {
       <div className="form-actions">
         <button type="button" className="button secondary" disabled={busy} onClick={close}>{t('Отмена')}</button>
         <button className="button primary" disabled={busy}>{t('Отправить на проверку')}</button>
+      </div>
+    </form>
+  </ModalShell>;
+}
+
+export function AllocateWorkTime({ entry, close, saved }: {
+  entry: WorkTimePage['items'][number];
+  close: () => void;
+  saved: () => void;
+}) {
+  const { t } = useI18n();
+  const [order, setOrder] = useState(entry.order);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    setError('');
+    try {
+      await api('/work-time/' + entry.id + '/order', {
+        method: 'PATCH', body: JSON.stringify({ orderId: order?.id ?? null, version: entry.allocationVersion }),
+      });
+      saved();
+    } catch (error) {
+      setError((error as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return <ModalShell title={t('Привязка времени к заказу')} onClose={close} busy={busy}>
+    <form className="editor-form" onSubmit={submit}>
+      <p><strong>{entry.employee.name}</strong></p>
+      <WorkTimeOrderPicker value={order} onChange={setOrder} disabled={busy}/>
+      {entry.locked && <p className="form-note">{t('Привязка применяется только в отчёте по заказам. Закрытый табель сохраняется в исходном виде.')}</p>}
+      {error && <p className="form-error" role="alert">{t(error)}</p>}
+      <div className="form-actions">
+        <button type="button" className="button secondary" disabled={busy} onClick={close}>{t('Отмена')}</button>
+        <button className="button primary" disabled={busy || order?.id === entry.order?.id}>{t('Сохранить привязку')}</button>
       </div>
     </form>
   </ModalShell>;

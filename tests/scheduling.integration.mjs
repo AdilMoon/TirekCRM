@@ -64,7 +64,7 @@ test('employee matching and scheduling enforce explanations tenant boundaries re
    const result=await Promise.all([service.assign(owner,o1.id,body),service.assign(owner,o1.id,body),service.assign(owner,o1.id,body)]);booking=result[0];assert.deepEqual(result,[booking,booking,booking]);
    assert.equal(await db.workBooking.count({where:{organizationId:org}}),1);assert.equal(await db.businessTask.count({where:{organizationId:org}}),1);
    assert.equal(await db.notification.count({where:{organizationId:org,recipientId:a.id,kind:'TASK_ASSIGNED'}}),1);assert.equal(await db.auditEvent.count({where:{organizationId:org,action:'ORDER_ASSIGNED'}}),1);
-   const order=await db.order.findUniqueOrThrow({where:{id:o1.id}});assert.equal(order.total.toFixed(2),'12345.67');assert.equal(order.version,2);
+   const order=await db.order.findUniqueOrThrow({where:{id:o1.id}});assert.equal(order.total.toFixed(2),'12345.67');assert.equal(order.version,2);assert.equal(order.plannedMinutes,60);
    await assert.rejects(()=>service.assign(owner,o1.id,{...body,durationMinutes:90}),code(409));
    assert.equal((await request('/orders/'+o1.id+'/assignment',undefined,a.cookie,'GET')).status,403);
    const mine=await tasks.get(a,booking.taskId);assert.ok(mine.booking);assert.equal(mine.order.id,o1.id);
@@ -95,7 +95,8 @@ test('employee matching and scheduling enforce explanations tenant boundaries re
    const snapshot=await input(owner,o1.id,slot('13:00'),a.id);
    await service.profile(owner,a.id,{...profile,version:1,skills:[...profile.skills,'ремонт']});
    await assert.rejects(()=>service.assign(owner,o1.id,snapshot),code(409));
-   const old=booking;booking=await service.assign(owner,o1.id,await input(owner,o1.id,slot('09:00',['уборка']),b.id));
+   const old=booking;booking=await service.assign(owner,o1.id,await input(owner,o1.id,{...slot('09:00',['уборка']),durationMinutes:45},b.id));
+   assert.equal((await db.order.findUniqueOrThrow({where:{id:o1.id}})).plannedMinutes,60);
    assert.ok((await db.workBooking.findUniqueOrThrow({where:{id:old.id}})).releasedAt);assert.equal((await db.businessTask.findUniqueOrThrow({where:{id:old.taskId}})).status,'CANCELLED');
    assert.equal((await request('/orders/'+o1.id+'/passport',undefined,a.cookie,'GET')).status,403);assert.equal((await request('/orders/'+o1.id+'/passport',undefined,b.cookie,'GET')).status,200);
    await service.cancel(owner,o1.id,old.id);assert.equal((await service.state(owner,o1.id)).current.id,booking.id);

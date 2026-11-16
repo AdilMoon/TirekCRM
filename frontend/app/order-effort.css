@@ -1,0 +1,21 @@
+.effort-body { display: grid; gap: 16px; min-width: 0; }
+.effort-body h3 { font-size: 15px; overflow-wrap: anywhere; }
+.effort-body .muted { font-size: 12px; line-height: 1.5; }
+.effort-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.effort-metrics > div { background: #f4f7f6; border-radius: 8px; padding: 12px; }
+.effort-metrics dt { font-size: 11px; color: #526b63; margin-bottom: 5px; }
+.effort-metrics dd { font-size: 14px; font-weight: 650; margin: 0; }
+.effort-overrun { color: #a73c2c; font-weight: 650; }
+.effort-scroll { overflow-x: auto; min-width: 0; }
+.effort-table { width: 100%; border-collapse: collapse; text-align: left; }
+.effort-table :is(th, td) { padding: 9px 6px; border-bottom: 1px solid var(--line); font-size: 12px; }
+.effort-table tbody th { min-width: 90px; overflow-wrap: anywhere; }
+.effort-table tbody td { min-width: 76px; }
+.effort-table .text-button { display: block; text-align: left; margin-bottom: 4px; overflow-wrap: anywhere; }
+.effort-filters { display: flex; justify-content: space-between; flex-wrap: wrap; align-items: center; gap: 10px; }
+
+@media (max-width: 600px) {
+  .effort-body .form-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .effort-table { table-layout: fixed; }
+  .effort-table :is(th, td) { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+}

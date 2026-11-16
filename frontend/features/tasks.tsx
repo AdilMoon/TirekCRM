@@ -10,6 +10,7 @@ import { Empty, Field, ModalShell, SearchBox } from '../components/ui';
 import type { TeamData } from './team';
 import { TaskDiscussion } from './task-discussion';
 import { OrderPassportManager } from './order-passport';
+import { WorkTimeCreate } from './work-time-forms';
 function OrderPicker({initial}:{initial:BusinessTask['order']}) {
  const {t}=useI18n();const [q,setQ]=useState(''),[page,setPage]=useState(1),[selected,setSelected]=useState(initial);
  const {result,busy,error,retry}=usePage<Order>('/orders/search',new URLSearchParams({q,page:String(page)}).toString());
@@ -39,6 +40,7 @@ export function Tasks({user,onSessionExpired}:{user:SessionUser;onSessionExpired
  const {t,dateLabel,formatDate}=useI18n();const owner=user.role==='OWNER';
  const [discussion,setDiscussion]=useState<BusinessTask|null>(null);
  const [passportId,setPassportId]=useState('');
+ const [timeOrder,setTimeOrder]=useState<BusinessTask['order']>(null);
  const [q,setQ]=useState(''),[page,setPage]=useState(1),[status,setStatus]=useState(''),[mine,setMine]=useState(false),[editor,setEditor]=useState<BusinessTask|null|undefined>(undefined),[busyId,setBusyId]=useState(''),[actionError,setActionError]=useState(''),[notice,setNotice]=useState('');
  const {result,error,errorStatus,busy,retry}=usePage<BusinessTask>('/tasks',new URLSearchParams({q,page:String(page),...(status?{status}:{}),...(mine?{assigneeId:user.id}:{})}).toString());
  useEffect(()=>{if(errorStatus===401)onSessionExpired?.();},[errorStatus,onSessionExpired]);
@@ -53,13 +55,14 @@ export function Tasks({user,onSessionExpired}:{user:SessionUser;onSessionExpired
  <h3>{task.title}</h3>{task.description&&<p className="task-description">{task.description}</p>}
  <div className="task-meta"><span>{task.assignee.name}{!task.assignee.isActive&&' · '+t('Доступ отключён')}</span>{task.order&&<span>{t('Заказ №')} {task.order.number} · {task.order.title}</span>}<span className={late?'task-overdue':''}><Clock3 size={14}/>{task.dueDate?dateLabel(task.dueDate):t('Без срока')}{late&&' · '+t('Просрочена')}</span></div>
  {task.booking&&!task.booking.releasedAt&&<p className="schedule-time">{t('Работа по графику: {0} — {1}',formatDate(task.booking.startsAt,{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}),formatDate(task.booking.endsAt,{hour:'2-digit',minute:'2-digit'}))}</p>}
- <div className="task-actions">{task.order&&['TODO','IN_PROGRESS'].includes(task.status)&&<button className="button secondary" onClick={()=>setPassportId(task.order!.id)}>{t('QR-паспорт заказа')}</button>}<button className="button secondary" onClick={()=>setDiscussion(task)}><MessageSquare size={16}/>{t('Обсуждение')}</button>{owner?<label>{t('Изменить статус')}<select disabled={!!busyId} value={task.status} onChange={e=>change(task,e.target.value as TaskStatus)}>{taskStatuses.map(s=><option key={s} value={s}>{t(taskStatusLabels[s])}</option>)}</select></label>:<>
+ <div className="task-actions">{!owner&&task.order&&task.status!=='CANCELLED'&&<button className="button secondary" onClick={()=>setTimeOrder(task.order)}><Clock3 size={16} aria-hidden="true"/>{t('Записать время по заказу')}</button>}{task.order&&['TODO','IN_PROGRESS'].includes(task.status)&&<button className="button secondary" onClick={()=>setPassportId(task.order!.id)}>{t('QR-паспорт заказа')}</button>}<button className="button secondary" onClick={()=>setDiscussion(task)}><MessageSquare size={16}/>{t('Обсуждение')}</button>{owner?<label>{t('Изменить статус')}<select disabled={!!busyId} value={task.status} onChange={e=>change(task,e.target.value as TaskStatus)}>{taskStatuses.map(s=><option key={s} value={s}>{t(taskStatusLabels[s])}</option>)}</select></label>:<>
  {task.status==='TODO'&&<button className="button primary" disabled={!!busyId} onClick={()=>change(task,'IN_PROGRESS')}>{t('Начать задачу')}</button>}
  {task.status==='IN_PROGRESS'&&<><button className="button primary" disabled={!!busyId} onClick={()=>change(task,'DONE')}>{t('Завершить задачу')}</button><button className="button secondary" disabled={!!busyId} onClick={()=>change(task,'TODO')}>{t('Вернуть в план')}</button></>}</>}</div>
  </article>;})}</div>
  {busy&&<Empty>{t('Загрузка…')}</Empty>}{!busy&&!error&&!result?.items.length&&<Empty>{t('Задач пока нет. Здесь появятся назначенные поручения.')}</Empty>}
  <Pagination result={result} busy={busy} page={page} setPage={setPage}/>
  {discussion&&<TaskDiscussion key={discussion.id} task={discussion} close={()=>setDiscussion(null)} onSessionExpired={onSessionExpired}/>}
+ {timeOrder&&<WorkTimeCreate employee="" initialOrder={timeOrder} close={()=>setTimeOrder(null)} saved={()=>{setTimeOrder(null);setNotice('Время отправлено на проверку');}}/>}
  {passportId&&<OrderPassportManager id={passportId} close={()=>{setPassportId('');retry();}}/>}
  {editor!==undefined&&<TaskEditor user={user} task={editor} close={()=>setEditor(undefined)} saved={()=>{setEditor(undefined);setNotice('Задача сохранена');retry();}}/>}
  </section>;

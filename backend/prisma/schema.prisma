@@ -98,10 +98,24 @@ model WorkTimeEntry {
   version Int @default(1)
   idempotencyKey String @db.Uuid
   createdAt DateTime @default(now())
+  submittedOrderId String? @db.Uuid
+  allocation WorkTimeAllocation?
 
+  @@unique([id, organizationId])
   @@unique([organizationId, createdById, idempotencyKey])
   @@index([organizationId, startsAt, id])
   @@index([organizationId, employeeId, startsAt, id])
+}
+model WorkTimeAllocation {
+  entryId String @id @db.Uuid
+  organizationId String @db.Uuid
+  orderId String? @db.Uuid
+  version Int @default(1)
+  entry WorkTimeEntry @relation(fields: [entryId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  order Order? @relation(fields: [orderId, organizationId], references: [id, organizationId], onDelete: Restrict)
+
+  @@unique([entryId, organizationId])
+  @@index([organizationId, orderId])
 }
 model WorkTimeMonth {
   organizationId String @db.Uuid
@@ -203,6 +217,8 @@ model Order {
   passport       OrderPassport?
   photos         OrderPhoto[]
   quotes         OrderQuote[]
+  plannedMinutes Int?
+  workTimeAllocations WorkTimeAllocation[]
   @@unique([organizationId, number])
   @@unique([id, organizationId])
   @@index([organizationId, status, createdAt])

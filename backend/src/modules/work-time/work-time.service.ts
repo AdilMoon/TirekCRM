@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import type { WorkTimeDecision, WorkTimeEntryInput, WorkTimePage, WorkTimeQuery } from '@tirek/contracts';
+import type { WorkTimeAllocationInput, WorkTimeDecision, WorkTimeEntryInput, WorkTimePage, WorkTimeQuery } from '@tirek/contracts';
 import type { AuthRequest } from '../../auth/session.guard';
 import { Database } from '../../database/database.service';
 import { AuditService } from '../audit/audit.service';
@@ -8,6 +8,7 @@ import { workTimePeriod, workTimeReport, workTimeSnapshot } from './work-time-re
 
 type Actor = AuthRequest['user'];
 const pageSize = 20;
+const orderSelect = { id: true, number: true, title: true } as const;
 const select = {
   id: true, employee: { select: { id: true, name: true } }, startsAt: true, endsAt: true, kind: true,
   status: true, decisionNote: true, version: true,
@@ -27,6 +28,36 @@ export class WorkTimeService {
     });
   }
 
+  orders(actor: Actor, q: string) {
+    const number = /^#?\s*\d{1,10}$/.test(q) ? Number(q.replace('#', '')) : 0;
+    return this.db.client.order.findMany({
+      where: {
+        ...this.eligibleOrders(actor),
+        ...(q ? { OR: [
+          { title: { contains: q.replace(/[\\%_]/g, '\\$&'), mode: 'insensitive' } },
+          ...(number > 0 && number <= 2147483647 ? [{ number }] : []),
+        ] } : {}),
+      },
+      select: orderSelect, orderBy: { number: 'desc' }, take: 30,
+    });
+  }
+
+  private eligibleOrders(actor: Actor): Prisma.OrderWhereInput {
+    return {
+      organizationId: actor.organizationId,
+      status: { not: 'CANCELLED' },
+      ...(actor.role === 'EMPLOYEE' ? {
+        tasks: { some: { organizationId: actor.organizationId, assigneeId: actor.id, status: { not: 'CANCELLED' } } },
+      } : {}),
+    };
+  }
+
+  private async checkOrder(tx: Prisma.TransactionClient, actor: Actor, id: string) {
+    if (!await tx.order.findFirst({ where: { ...this.eligibleOrders(actor), id }, select: { id: true } })) {
+      throw new NotFoundException('Заказ недоступен для учёта времени');
+    }
+  }
+
   async list(actor: Actor, query: WorkTimeQuery): Promise<WorkTimePage> {
     if (actor.role === 'EMPLOYEE' && query.employeeId) throw new ForbiddenException('Недостаточно прав');
     const employeeId = actor.role === 'EMPLOYEE' ? actor.id : query.employeeId;
@@ -43,6 +74,10 @@ export class WorkTimeService {
       minutes: number;
       nightMinutes: number;
       locked: boolean;
+      orderId: string | null;
+      orderNumber: number;
+      orderTitle: string;
+      allocationVersion: number | null;
       approvedMinutes: bigint;
       submittedMinutes: bigint;
       approvedOvertimeMinutes: bigint;
@@ -66,12 +101,20 @@ export class WorkTimeService {
         LIMIT ${pageSize} OFFSET ${(query.page - 1) * pageSize}
       )
       SELECT p.*, t.*, m."closedAt", period."endsAt" <= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') AS ended,
+             o.id AS "orderId", o.number AS "orderNumber", o.title AS "orderTitle", a.version AS "allocationVersion",
              EXISTS (SELECT 1 FROM "WorkTimeMonth" closed
                WHERE closed."organizationId" = ${actor.organizationId}::uuid
                  AND closed."startsAt" < p."endsAt" AND closed."endsAt" > p."startsAt") AS locked,
              (SELECT COUNT(*) FROM filtered) AS total
       FROM totals t CROSS JOIN period
       LEFT JOIN page_rows p ON TRUE
+      LEFT JOIN "WorkTimeAllocation" a ON a."entryId" = p.id AND a."organizationId" = ${actor.organizationId}::uuid
+      LEFT JOIN "Order" o ON o.id = a."orderId" AND o."organizationId" = a."organizationId"
+        ${actor.role === 'EMPLOYEE' ? Prisma.sql`AND EXISTS (
+          SELECT 1 FROM "BusinessTask" task
+          WHERE task."organizationId" = o."organizationId" AND task."orderId" = o.id
+            AND task."assigneeId" = ${actor.id}::uuid AND task.status <> 'CANCELLED'
+        )` : Prisma.empty}
       LEFT JOIN "WorkTimeMonth" m ON m."organizationId" = ${actor.organizationId}::uuid AND m.month = ${query.month}
       ORDER BY p."startsAt" DESC, p."id" DESC`);
     const totals = rows[0];
@@ -88,6 +131,8 @@ export class WorkTimeService {
         status: row.status,
         decisionNote: row.decisionNote,
         version: row.version,
+        order: row.orderId ? { id: row.orderId, number: row.orderNumber, title: row.orderTitle } : null,
+        allocationVersion: row.allocationVersion ?? 0,
       }] : []),
       total: Number(totals.total),
       pages: Math.ceil(Number(totals.total) / pageSize),
@@ -138,15 +183,20 @@ export class WorkTimeService {
     const startsAt = new Date(input.startsAt);
     const endsAt = new Date(input.endsAt);
     const kind = input.kind ?? 'WORK';
+    const orderId = input.orderId ?? null;
+    if (orderId && kind === 'ABSENCE') throw new BadRequestException('Неотработанное время нельзя привязать к заказу');
     const key = { organizationId: actor.organizationId, createdById: actor.id, idempotencyKey: input.idempotencyKey };
     const findReplay = async (tx: Prisma.TransactionClient) => {
       const entry = await tx.workTimeEntry.findUnique({
-        where: { organizationId_createdById_idempotencyKey: key }, select,
+        where: { organizationId_createdById_idempotencyKey: key }, select: { ...select, submittedOrderId: true },
       });
-      if (entry && (entry.employee.id !== employeeId || +entry.startsAt !== +startsAt || +entry.endsAt !== +endsAt || entry.kind !== kind)) {
+      if (!entry) return null;
+      const { submittedOrderId, ...result } = entry;
+      if (entry.employee.id !== employeeId || +entry.startsAt !== +startsAt || +entry.endsAt !== +endsAt ||
+          entry.kind !== kind || submittedOrderId !== orderId) {
         throw new ConflictException('Ключ операции уже использован');
       }
-      return entry;
+      return result;
     };
     try {
       return await this.write(actor, async tx => {
@@ -159,6 +209,7 @@ export class WorkTimeService {
           select: { id: true },
         });
         if (!employee) throw new NotFoundException('Активный исполнитель не найден');
+        if (orderId) await this.checkOrder(tx, actor, orderId);
         const collision = await tx.workTimeEntry.findFirst({
           where: {
             organizationId: actor.organizationId, employeeId,
@@ -169,9 +220,10 @@ export class WorkTimeService {
         });
         if (collision) throw overlap();
         const entry = await tx.workTimeEntry.create({
-          data: { ...key, employeeId, startsAt, endsAt, kind, createdAt: new Date() }, select,
+          data: { ...key, employeeId, startsAt, endsAt, kind, submittedOrderId: orderId, createdAt: new Date() }, select,
         });
-        await this.audit.record(tx, actor, 'WORK_TIME', entry.id, 'WORK_TIME_SUBMITTED', { employeeId, kind });
+        if (orderId) await tx.workTimeAllocation.create({ data: { entryId: entry.id, organizationId: actor.organizationId, orderId } });
+        await this.audit.record(tx, actor, 'WORK_TIME', entry.id, 'WORK_TIME_SUBMITTED', { employeeId, kind, orderId });
         return entry;
       });
     } catch (error) {
@@ -184,6 +236,36 @@ export class WorkTimeService {
         throw overlap();
       });
     }
+  }
+
+  allocate(actor: Actor, id: string, input: WorkTimeAllocationInput) {
+    this.requireOwner(actor);
+    return this.write(actor, async tx => {
+      const entry = await tx.workTimeEntry.findFirst({
+        where: { id, organizationId: actor.organizationId },
+        select: { kind: true, status: true, allocation: { select: { orderId: true, version: true } } },
+      });
+      if (!entry) throw new NotFoundException('Запись табеля не найдена');
+      if (entry.kind === 'ABSENCE' || !['SUBMITTED', 'APPROVED'].includes(entry.status)) {
+        throw new ConflictException('К заказу можно привязать рабочие часы на проверке или подтверждённые часы');
+      }
+      const version = entry.allocation?.version ?? 0;
+      const previousOrderId = entry.allocation?.orderId ?? null;
+      if (input.orderId === previousOrderId && (version === input.version || version === input.version + 1)) return { version };
+      if (version !== input.version) throw stale();
+      if (input.orderId) await this.checkOrder(tx, actor, input.orderId);
+      // Only the analytical allocation changes, including for a closed payroll period.
+      const allocation = await tx.workTimeAllocation.upsert({
+        where: { entryId: id },
+        create: { entryId: id, organizationId: actor.organizationId, orderId: input.orderId },
+        update: { orderId: input.orderId, version: { increment: 1 } },
+        select: { version: true },
+      });
+      await this.audit.record(tx, actor, 'WORK_TIME', id, 'WORK_TIME_ORDER_CHANGED', {
+        previousOrderId, orderId: input.orderId,
+      });
+      return allocation;
+    });
   }
 
   decide(actor: Actor, id: string, input: WorkTimeDecision) {

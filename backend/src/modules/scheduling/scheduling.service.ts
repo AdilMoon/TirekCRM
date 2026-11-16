@@ -76,7 +76,7 @@ export class SchedulingService {
    const order=await tx.order.findUniqueOrThrow({where:{id}});
    const task=await tx.businessTask.create({data:{organizationId:actor.organizationId,createdById:actor.id,assigneeId:input.employeeId,orderId:id,title:order.title.slice(0,200),dueDate:new Date(almatyTime(new Date(plan.startsAt)).day+'T00:00:00Z')}});
    const booking=await tx.workBooking.create({data:{organizationId:actor.organizationId,orderId:id,employeeId:input.employeeId,taskId:task.id,startsAt:new Date(plan.startsAt),endsAt:new Date(plan.endsAt),requiredSkills:input.requiredSkills,createdById:actor.id,idempotencyKey,inputHash},select:bookingSelect});
-   await tx.order.update({where:{id},data:{version:{increment:1}}});
+   await tx.order.update({where:{id},data:{version:{increment:1},plannedMinutes:order.plannedMinutes??input.durationMinutes}});
    await this.audit.record(tx,actor,'TASK',task.id,'TASK_CREATED',{title:task.title});
    await this.audit.record(tx,actor,'ORDER',id,'ORDER_ASSIGNED',{number:order.number,employee:candidate.name,startsAt:plan.startsAt,endsAt:plan.endsAt,requiredSkills:input.requiredSkills,profileVersion:input.profileVersion,workloadMinutes:candidate.workloadMinutes,activeTasks:candidate.activeTasks,recommended:plan.recommendedId===candidate.id});
    await publishTaskNotification(tx,{organizationId:actor.organizationId,taskId:task.id,actorId:actor.id,actorName:actor.name,kind:'TASK_ASSIGNED',eventKey:'schedule:'+booking.id+':assigned'});

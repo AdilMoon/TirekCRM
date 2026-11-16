@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { RouteConfig } from '@nestjs/platform-fastify';
 import type { FastifyReply } from 'fastify';
-import { workTimeDecisionSchema, workTimeEntrySchema, workTimeMonthSchema, workTimeQuerySchema } from '@tirek/contracts';
+import { workTimeAllocationSchema, workTimeDecisionSchema, workTimeEntrySchema, workTimeMonthSchema, workTimeOrderSearch, workTimeQuerySchema } from '@tirek/contracts';
 import { EmployeeAccess } from '../../auth/access';
 import { SessionGuard, type AuthRequest } from '../../auth/session.guard';
 import { WorkTimeService } from './work-time.service';
@@ -20,6 +20,12 @@ export class WorkTimeController {
   @Get('people')
   people(@Req() req: AuthRequest) {
     return this.workTime.people(req.user);
+  }
+
+  @Get('orders')
+  @EmployeeAccess()
+  orders(@Req() req: AuthRequest, @Query() query: unknown) {
+    return this.workTime.orders(req.user, workTimeOrderSearch.parse(query).q);
   }
 
   @Post('close')
@@ -46,5 +52,10 @@ export class WorkTimeController {
   @Patch(':id/decision')
   decide(@Req() req: AuthRequest, @Param('id', ParseUUIDPipe) id: string, @Body() body: unknown) {
     return this.workTime.decide(req.user, id, workTimeDecisionSchema.parse(body));
+  }
+
+  @Patch(':id/order')
+  allocate(@Req() req: AuthRequest, @Param('id', ParseUUIDPipe) id: string, @Body() body: unknown) {
+    return this.workTime.allocate(req.user, id, workTimeAllocationSchema.parse(body));
   }
 }

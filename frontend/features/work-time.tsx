@@ -10,7 +10,7 @@ import { api } from '../lib/api';
 import { downloadCsv } from '../lib/download-csv';
 import { usePage } from '../lib/use-page';
 import { almatyDateTime } from '../lib/work-time-date';
-import { CloseWorkTimeMonth, decisionLabels, ReviewWorkTime, WorkTimeCreate } from './work-time-forms';
+import { AllocateWorkTime, CloseWorkTimeMonth, decisionLabels, ReviewWorkTime, WorkTimeCreate } from './work-time-forms';
 
 export function WorkTime({ owner }: { owner: boolean }) {
   const { t, formatDate } = useI18n();
@@ -25,6 +25,7 @@ export function WorkTime({ owner }: { owner: boolean }) {
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState('');
   const [review, setReview] = useState<{ entry: WorkTimeEntry; status: WorkTimeDecision['status'] } | null>(null);
+  const [allocation, setAllocation] = useState<WorkTimePage['items'][number] | null>(null);
   const [success, setSuccess] = useState('');
   const params = new URLSearchParams({ month, page: String(page) });
   if (status) params.set('status', status);
@@ -108,6 +109,7 @@ export function WorkTime({ owner }: { owner: boolean }) {
             {owner && <strong>{entry.employee.name}</strong>}
             <p><time dateTime={entry.startsAt}>{date(entry.startsAt)}</time> — <time dateTime={entry.endsAt}>{date(entry.endsAt)}</time></p>
             <p className="muted">{t(workTimeKindLabels[entry.kind])}{entry.nightMinutes > 0 && ' · ' + t('Ночные за месяц: {0}', duration(entry.nightMinutes))}</p>
+            {entry.order && <p className="muted">{t('Заказ № {0}', entry.order.number)} · {entry.order.title}</p>}
             {entry.locked && !period?.closedAt && <p className="muted">{t('Интервал затрагивает закрытый месяц')}</p>}
             {entry.decisionNote && <p className="muted">{t('Причина решения')} · {entry.decisionNote}</p>}
           </div>
@@ -115,12 +117,13 @@ export function WorkTime({ owner }: { owner: boolean }) {
             <span className="work-time-badge" data-status={entry.status}>{t(workTimeStatusLabels[entry.status])}</span>
             <strong>{duration(entry.monthMinutes)}</strong>
           </div>
-          {owner && !entry.locked && entry.status === 'SUBMITTED' && <div className="work-time-actions">
-            <button type="button" className="button primary" onClick={() => setReview({ entry, status: 'APPROVED' })}>{t(decisionLabels.APPROVED)}</button>
-            <button type="button" className="button secondary" onClick={() => setReview({ entry, status: 'REJECTED' })}>{t(decisionLabels.REJECTED)}</button>
-          </div>}
-          {owner && !entry.locked && entry.status === 'APPROVED' && <div className="work-time-actions">
-            <button type="button" className="button secondary" onClick={() => setReview({ entry, status: 'VOIDED' })}>{t(decisionLabels.VOIDED)}</button>
+          {owner && ['SUBMITTED', 'APPROVED'].includes(entry.status) && <div className="work-time-actions">
+            {!entry.locked && entry.status === 'SUBMITTED' && <>
+              <button type="button" className="button primary" onClick={() => setReview({ entry, status: 'APPROVED' })}>{t(decisionLabels.APPROVED)}</button>
+              <button type="button" className="button secondary" onClick={() => setReview({ entry, status: 'REJECTED' })}>{t(decisionLabels.REJECTED)}</button>
+            </>}
+            {!entry.locked && entry.status === 'APPROVED' && <button type="button" className="button secondary" onClick={() => setReview({ entry, status: 'VOIDED' })}>{t(decisionLabels.VOIDED)}</button>}
+            {entry.kind !== 'ABSENCE' && <button type="button" className="button secondary" onClick={() => setAllocation(entry)}>{t(entry.order ? 'Изменить привязку' : 'Привязать к заказу')}</button>}
           </div>}
         </article>)}
         {list.busy && <Empty>{t('Загрузка…')}</Empty>}
@@ -134,6 +137,9 @@ export function WorkTime({ owner }: { owner: boolean }) {
     }}/>}
     {review && <ReviewWorkTime {...review} close={() => { setReview(null); list.retry(); }} saved={() => {
       setReview(null); setSuccess('Решение по записи сохранено'); setPage(1); list.retry();
+    }}/>}
+    {allocation && <AllocateWorkTime entry={allocation} close={() => { setAllocation(null); list.retry(); }} saved={() => {
+      setAllocation(null); setSuccess('Привязка времени сохранена'); list.retry();
     }}/>}
     {closing && <CloseWorkTimeMonth month={closing} close={() => { setClosing(null); list.retry(); }} saved={() => {
       setClosing(null); setSuccess('Табель за месяц закрыт'); list.retry();

@@ -44,6 +44,7 @@ model Organization {
   expenses     Expense[]
   documents    Document[]
   workTimeEntries WorkTimeEntry[]
+  workTimeMonths WorkTimeMonth[]
 }
 model User {
   id             String @id @default(uuid()) @db.Uuid
@@ -67,6 +68,7 @@ model User {
   telegramPairing TelegramPairing?
   workTimeEntries WorkTimeEntry[] @relation("WorkTimeEmployee")
   enteredWorkTime WorkTimeEntry[] @relation("WorkTimeCreator")
+  closedWorkTimeMonths WorkTimeMonth[]
   @@unique([id, organizationId])
 }
 enum WorkTimeStatus {
@@ -74,6 +76,11 @@ enum WorkTimeStatus {
   APPROVED
   REJECTED
   VOIDED
+}
+enum WorkTimeKind {
+  WORK
+  OVERTIME
+  ABSENCE
 }
 model WorkTimeEntry {
   id String @id @default(uuid()) @db.Uuid
@@ -85,6 +92,7 @@ model WorkTimeEntry {
   createdBy User @relation("WorkTimeCreator", fields: [createdById, organizationId], references: [id, organizationId], onDelete: Restrict)
   startsAt DateTime
   endsAt DateTime
+  kind WorkTimeKind @default(WORK)
   status WorkTimeStatus @default(SUBMITTED)
   decisionNote String @default("") @db.VarChar(300)
   version Int @default(1)
@@ -94,6 +102,20 @@ model WorkTimeEntry {
   @@unique([organizationId, createdById, idempotencyKey])
   @@index([organizationId, startsAt, id])
   @@index([organizationId, employeeId, startsAt, id])
+}
+model WorkTimeMonth {
+  organizationId String @db.Uuid
+  organization Organization @relation(fields: [organizationId], references: [id])
+  month String @db.VarChar(7)
+  startsAt DateTime
+  endsAt DateTime
+  closedAt DateTime
+  closedById String @db.Uuid
+  closedBy User @relation(fields: [closedById, organizationId], references: [id, organizationId], onDelete: Restrict)
+  csv String
+
+  @@id([organizationId, month])
+  @@index([organizationId, endsAt])
 }
 model Session {
   id String @unique @default(uuid()) @db.Uuid

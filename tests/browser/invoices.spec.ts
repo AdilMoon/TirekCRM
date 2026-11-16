@@ -1,4 +1,4 @@
-import {test,expect,type BrowserContext} from './fixtures';
+import {openManagement,test,expect,type BrowserContext} from './fixtures';
 import 'dotenv/config';
 import {PrismaClient} from '@prisma/client';
 import {PrismaPg} from '@prisma/adapter-pg';
@@ -28,7 +28,7 @@ test.afterAll(async()=>{await db.$disconnect();});
 
 test('requisites, invoice creation, snapshot print and RU KK EN mobile layout',async({page,context},testInfo)=>{
  await signIn(context);await page.goto('/');
- await page.getByRole('button',{name:'Настройки',exact:true}).click();
+ await openManagement(page);await page.getByRole('button',{name:'Настройки',exact:true}).click();
  await page.getByLabel('Банк',{exact:true}).fill('Updated test bank');
  await page.getByRole('button',{name:'Сохранить реквизиты',exact:true}).click();
  await expect(page.getByRole('status')).toContainText('Реквизиты сохранены');

@@ -50,6 +50,9 @@
 .work-time-summary span { display: flex; align-items: center; gap: 8px; font-size: 12px; }
 .work-time-summary strong { font-size: clamp(18px, 2.6vw, 27px); font-variant-numeric: tabular-nums; }
 .work-time-entries { display: grid; gap: 10px; }
+.work-time-period, .work-time-period-status { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.work-time-period:not(:empty) { justify-content: space-between; margin-bottom: 16px; }
+.work-time-period-status { color: #205746; font-size: 13px; font-weight: 600; }
 .work-time-entry {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

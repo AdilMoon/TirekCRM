@@ -1,6 +1,8 @@
 import { PayloadTooLargeException } from '@nestjs/common';
 import type { Movement } from '@tirek/contracts';
 import { cents, money } from '../../common/money';
+import { csvText } from '../../common/csv';
+export { csvText };
 
 export const MAX_MOVEMENT_EXPORT_ROWS = 10000;
 export const MAX_MOVEMENT_EXPORT_BYTES = 8 * 1024 * 1024;
@@ -8,12 +10,6 @@ type ExportRow = Omit<Movement, 'amount' | 'createdAt'> & { amount: { toFixed(pl
 const almatyDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Almaty', year: 'numeric', month: '2-digit', day: '2-digit' });
 const columns = ['id', 'kind', 'created_at_utc', 'date_almaty', 'currency', 'amount', 'cash_flow_amount', 'description', 'category', 'order_id', 'order_number', 'source_id'];
 
-// RFC 4180 quoting also keeps delimiters and newlines inside the original cell.
-// Formula protection is separate: guard whitespace/control/full-width prefixes too.
-export function csvText(value: string) {
-  const dangerous = /^[\s\u0000-\u001f\u007f]*[=+\-@＝＋－＠]|^[\u0000-\u001f\u007f]/u.test(value);
-  return '"' + (dangerous ? "'" + value : value).replace(/"/g, '""') + '"';
-}
 export function movementCsv(rows: ExportRow[]) {
   const lines = ['\ufeff' + columns.map(csvText).join(',') + '\r\n'];
   let bytes = Buffer.byteLength(lines[0], 'utf8'), received = 0n, expenses = 0n;

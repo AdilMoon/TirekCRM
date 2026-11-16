@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures';
+import { test, expect, openManagement } from './fixtures';
 import type { Page, TestInfo } from '@playwright/test';
 import 'dotenv/config';
 import { randomUUID, randomBytes, scryptSync } from 'node:crypto';
@@ -141,7 +141,8 @@ test('TC06 server search finds matching clients hides other tenants and clears c
 });
 test('TC07 navigation switches all main workspace sections', async ({ page }, info) => {
   await login(page);
-  for (const name of ['Клиенты', 'Заказы', 'Финансы', 'Документы', 'Задачи', 'Команда', 'Настройки']) {
+  for (const name of ['Клиенты', 'Заказы', 'Финансы', 'Документы', 'Задачи', 'Табель', 'Команда', 'Настройки']) {
+    if (name === 'Команда' || name === 'Настройки') await openManagement(page);
     await page.getByRole('button', { name, exact: true }).click();
     await expect(page.locator('main').getByRole('heading', { name, exact: true }).first()).toBeVisible();
   }

@@ -1,5 +1,7 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
-import { workTimeDecisionSchema, workTimeEntrySchema, workTimeQuerySchema } from '@tirek/contracts';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
+import { RouteConfig } from '@nestjs/platform-fastify';
+import type { FastifyReply } from 'fastify';
+import { workTimeDecisionSchema, workTimeEntrySchema, workTimeMonthSchema, workTimeQuerySchema } from '@tirek/contracts';
 import { EmployeeAccess } from '../../auth/access';
 import { SessionGuard, type AuthRequest } from '../../auth/session.guard';
 import { WorkTimeService } from './work-time.service';
@@ -18,6 +20,21 @@ export class WorkTimeController {
   @Get('people')
   people(@Req() req: AuthRequest) {
     return this.workTime.people(req.user);
+  }
+
+  @Post('close')
+  @RouteConfig({ rateLimit: { max: 10, timeWindow: '1 minute' } })
+  closeMonth(@Req() req: AuthRequest, @Body() body: unknown) {
+    return this.workTime.closeMonth(req.user, workTimeMonthSchema.parse(body).month);
+  }
+
+  @Get('export')
+  @RouteConfig({ rateLimit: { max: 10, timeWindow: '1 minute' } })
+  async exportMonth(@Req() req: AuthRequest, @Query() query: unknown, @Res({ passthrough: true }) reply: FastifyReply) {
+    const { month } = workTimeMonthSchema.parse(query);
+    const csv = await this.workTime.exportMonth(req.user, month);
+    reply.type('text/csv; charset=utf-8').header('Content-Disposition', 'attachment; filename="tirek-timesheet-' + month + '.csv"');
+    return csv;
   }
 
   @Post()

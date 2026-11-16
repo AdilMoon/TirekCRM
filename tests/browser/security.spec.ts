@@ -1,4 +1,4 @@
-import { test,expect,type BrowserContext } from './fixtures';
+import {openManagement, test,expect,type BrowserContext } from './fixtures';
 import 'dotenv/config';
 import { randomUUID,randomBytes,createHash,scryptSync } from 'node:crypto';
 import { PrismaClient } from '@prisma/client';
@@ -36,7 +36,7 @@ test('owner manages sessions and changes password with cookie rotation and trans
  const current=await signIn(context,ownerId);
  const other=await session(ownerId,'<img src=x onerror=alert(1)>');
  await page.goto('/');
- await page.getByRole('button',{name:'Настройки',exact:true}).click();
+ await openManagement(page);await page.getByRole('button',{name:'Настройки',exact:true}).click();
  const security=page.getByRole('region',{name:'Безопасность аккаунта',exact:true});
  await expect(security.locator('.session-card')).toHaveCount(2);
  const otherCard=security.locator('.session-card').filter({hasText:'Неизвестный браузер'});
@@ -95,6 +95,7 @@ test('owner manages sessions and changes password with cookie rotation and trans
  await page.getByRole('region',{name:'Account security',exact:true}).screenshot({path:'test-results/account-security-mobile.png'});
  await page.reload();
  await page.getByRole('button',{name:'Menu',exact:true}).click();
+ await openManagement(page,'Management');
  await page.getByRole('button',{name:'Settings',exact:true}).click();
  await expect(page.getByText('This session',{exact:true})).toBeVisible();
  await page.getByRole('button',{name:'Sign out here',exact:true}).click();

@@ -9,6 +9,13 @@ export const workTimeStatusLabels: Record<WorkTimeStatus, string> = {
   REJECTED: 'Часы отклонены',
   VOIDED: 'Запись аннулирована',
 };
+export const workTimeKinds = ['WORK', 'OVERTIME', 'ABSENCE'] as const;
+export type WorkTimeKind = typeof workTimeKinds[number];
+export const workTimeKindLabels: Record<WorkTimeKind, string> = {
+  WORK: 'Обычная работа',
+  OVERTIME: 'Сверхурочная работа',
+  ABSENCE: 'Неотработанное время',
+};
 
 const uuid = z.uuid().transform(value => value.toLowerCase());
 const instant = z.iso.datetime({ offset: true }).refine(value => {
@@ -18,6 +25,7 @@ const instant = z.iso.datetime({ offset: true }).refine(value => {
 export const workTimeEntrySchema = z.strictObject({
   startsAt: instant,
   endsAt: instant,
+  kind: z.enum(workTimeKinds).optional(),
   employeeId: uuid.optional(),
   idempotencyKey: uuid,
 }).refine(value => {
@@ -26,8 +34,10 @@ export const workTimeEntrySchema = z.strictObject({
 });
 export type WorkTimeEntryInput = z.infer<typeof workTimeEntrySchema>;
 
-export const workTimeQuerySchema = z.strictObject({
+export const workTimeMonthSchema = z.strictObject({
   month: z.string().regex(/^20\d{2}-(0[1-9]|1[0-2])$/),
+});
+export const workTimeQuerySchema = workTimeMonthSchema.extend({
   employeeId: uuid.optional(),
   status: z.enum(workTimeStatuses).optional(),
   page: z.string().regex(/^[1-9]\d{0,4}$/).transform(Number).default(1),
@@ -57,10 +67,18 @@ export interface WorkTimeEntry {
   employee: Pick<WorkTimePerson, 'id' | 'name'>;
   startsAt: string;
   endsAt: string;
+  kind: WorkTimeKind;
   status: WorkTimeStatus;
   decisionNote: string;
   version: number;
 }
-export interface WorkTimePage extends PageResult<WorkTimeEntry> {
-  summary: { approvedMinutes: number; submittedMinutes: number };
+export interface WorkTimePage extends PageResult<WorkTimeEntry & { monthMinutes: number; nightMinutes: number; locked: boolean }> {
+  summary: {
+    approvedMinutes: number;
+    submittedMinutes: number;
+    approvedOvertimeMinutes: number;
+    approvedNightMinutes: number;
+    approvedAbsenceMinutes: number;
+  };
+  period: { month: string; closedAt: string | null; ended: boolean };
 }

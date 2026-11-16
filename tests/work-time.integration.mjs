@@ -32,7 +32,13 @@ async function request(path, user, method = 'GET', body, source = origin) {
     method, headers: { Origin: source, ...(user ? { Cookie: user.cookie } : {}), ...(body ? { 'Content-Type': 'application/json' } : {}) },
     body: body ? JSON.stringify(body) : undefined,
   });
-  return { status: response.status, body: await response.json(), cache: response.headers.get('cache-control') };
+  const contentType = response.headers.get('content-type') ?? '';
+  return {
+    status: response.status,
+    body: contentType.startsWith('text/csv') ? new TextDecoder('utf-8', { ignoreBOM: true }).decode(await response.arrayBuffer()) : await response.json(),
+    cache: response.headers.get('cache-control'),
+    attachment: response.headers.get('content-disposition'),
+  };
 }
 
 const shift = (startsAt, endsAt) => ({ startsAt, endsAt, idempotencyKey: randomUUID() });
@@ -76,7 +82,9 @@ test('actual work time preserves scope, month boundaries and review history', as
         assert.equal(own.cache, 'no-store');
         assert.deepEqual(own.body.items.map(entry => entry.id), [tracked.id]);
         assert.equal(own.body.items[0].startsAt, tracked.startsAt);
-        assert.deepEqual(own.body.summary, { approvedMinutes: 0, submittedMinutes: 30 });
+        assert.equal(own.body.summary.approvedMinutes, 0);
+        assert.equal(own.body.summary.submittedMinutes, 30);
+        assert.equal(own.body.items[0].monthMinutes, 30);
         const all = await request('?month=' + month + '&status=APPROVED', owner);
         assert.equal(all.body.total, 0);
         assert.equal(all.body.summary.submittedMinutes, 60);
@@ -136,8 +144,79 @@ test('actual work time preserves scope, month boundaries and review history', as
       await assert.rejects(() => workTime.create(employee, overnight), code(403));
       assert.ok((await request('?month=2025-10&employeeId=' + employee.id, owner)).body.items.length > 0);
     });
+    await t.test('night and overtime can coincide; absence is separate across an Almaty month boundary', async () => {
+      await db.user.update({ where: { id: colleague.id }, data: { name: ' =1+2' } });
+      const input = { ...shift('2025-12-31T16:30:00Z','2026-01-01T02:00:00Z'), kind: 'OVERTIME' };
+      const worked = await workTime.create(colleague, input);
+      await assert.rejects(() => workTime.create(colleague, { ...input, kind: 'WORK' }), code(409));
+      await workTime.decide(owner, worked.id, { status: 'APPROVED', version: 1 });
+      const absence = await workTime.create(colleague, { ...shift('2025-12-15T17:00:00Z','2025-12-15T18:00:00Z'), kind: 'ABSENCE' });
+      await workTime.decide(owner, absence.id, { status: 'APPROVED', version: 1 });
+      const dec = await request('?month=2025-12', colleague);
+      const jan = await request('?month=2026-01', colleague);
+      assert.deepEqual(dec.body.summary, {
+        approvedMinutes: 150, submittedMinutes: 0, approvedOvertimeMinutes: 150, approvedNightMinutes: 120, approvedAbsenceMinutes: 60,
+      });
+      assert.equal(jan.body.summary.approvedMinutes, 420);
+      assert.equal(jan.body.summary.approvedOvertimeMinutes, 420);
+      assert.equal(jan.body.summary.approvedNightMinutes, 360);
+      assert.equal(dec.body.items.find(entry => entry.id === absence.id).nightMinutes, 0);
+      assert.equal(jan.body.items[0].monthMinutes, 420);
+      // The 2024 clock rollback added one elapsed hour to the local 22:00–06:00 night.
+      const clockChange = await workTime.create(colleague, shift('2024-02-29T16:00:00Z','2024-03-01T01:00:00Z'));
+      await workTime.decide(owner, clockChange.id, { status: 'APPROVED', version: 1 });
+      const feb = (await request('?month=2024-02', colleague)).body.summary;
+      const mar = (await request('?month=2024-03', colleague)).body.summary;
+      assert.equal(feb.approvedNightMinutes + mar.approvedNightMinutes, 540);
+    });
+    await t.test('closing is atomic and freezes a tenant-scoped, formula-safe CSV for the whole month', async () => {
+      const month = '2025-12';
+      const exportPath = '/export?month=' + month;
+      assert.equal((await request(exportPath, colleague)).status, 403);
+      assert.equal((await request(exportPath, external)).status, 409);
+      const openExport = await request(exportPath, owner);
+      assert.equal(openExport.status, 409);
+      assert.equal(openExport.attachment, null);
+      assert.equal((await request('/close', colleague, 'POST', { month })).status, 403);
+      assert.equal((await request('/close', owner, 'POST', { month, organizationId: outside })).status, 400);
+      assert.equal((await request('/close', owner, 'POST', { month: '2099-01' })).status, 409);
+      const pending = await workTime.create(colleague, shift('2025-12-12T12:00:00Z','2025-12-12T13:00:00Z'));
+      assert.equal((await request('/close', owner, 'POST', { month })).status, 409);
+      await workTime.decide(owner, pending.id, { status: 'REJECTED', version: 1, note: 'Invalid interval' });
+      const broken = new WorkTimeService({ client: db }, { record: async () => { throw Error('closing audit fixture'); } });
+      await assert.rejects(() => broken.closeMonth(owner, month), /closing audit fixture/);
+      assert.equal(await db.workTimeMonth.count({ where: { organizationId: org, month } }), 0);
+      const race = await Promise.allSettled([
+        workTime.closeMonth(owner, month),
+        workTime.create(colleague, shift('2025-12-13T12:00:00Z','2025-12-13T13:00:00Z')),
+      ]);
+      assert.equal(race.filter(value => value.status === 'fulfilled').length, 1);
+      if (race[1].status === 'fulfilled') {
+        assert.ok(code(409)(race[0].reason));
+        await workTime.decide(owner, race[1].value.id, { status: 'REJECTED', version: 1, note: 'Race fixture' });
+      } else assert.ok(code(409)(race[1].reason));
+      const closed = await request('/close', owner, 'POST', { month });
+      assert.equal(closed.status, 201);
+      assert.equal((await request('/close', owner, 'POST', { month })).body.closedAt, closed.body.closedAt);
+      assert.equal((await request('?month=2025-12', colleague)).body.period.closedAt, closed.body.closedAt);
+      const crossing = (await request('?month=2026-01', colleague)).body.items[0];
+      assert.equal(crossing.locked, true);
+      assert.equal((await request('/' + crossing.id + '/decision', owner, 'PATCH', { status: 'VOIDED', version: 2, note: 'Blocked by closure' })).status, 409);
+      assert.equal((await request('', colleague, 'POST', shift('2025-12-12T12:00:00Z','2025-12-12T13:00:00Z'))).status, 409);
+      const exported = await request(exportPath, owner);
+      assert.equal(exported.status, 200);
+      assert.equal(exported.cache, 'no-store');
+      assert.equal(exported.attachment, 'attachment; filename="tirek-timesheet-2025-12.csv"');
+      assert.equal(exported.body.codePointAt(0), 0xfeff);
+      assert.ok(exported.body.includes(`"2025-12","${colleague.id}","' =1+2",150,150,120,60\r\n`));
+      assert.equal(exported.body.includes('Invalid interval'), false);
+      await db.user.update({ where: { id: colleague.id }, data: { name: 'New name' } });
+      assert.equal((await request(exportPath, owner)).body, exported.body);
+      assert.equal(await db.auditEvent.count({ where: { organizationId: org, action: 'WORK_TIME_MONTH_CLOSED' } }), 1);
+    });
   } finally {
     const owned = { organizationId: { in: [org, outside] } };
+    await db.workTimeMonth.deleteMany({ where: owned });
     await db.workTimeEntry.deleteMany({ where: owned });
     await db.auditEvent.deleteMany({ where: owned });
     await db.user.deleteMany({ where: owned });

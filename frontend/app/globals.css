@@ -81,3 +81,8 @@
 .report-controls .tabs { flex-wrap:wrap; }
 @media(max-width:760px) { .financial-operation { padding:16px; } }
 .report-export-bar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.owner-navigation { margin-top: 18px; }
+.owner-navigation .management-toggle { margin-top: 12px; }
+.management-toggle svg:last-child { margin-left: auto; }
+.management-toggle[aria-expanded="true"] svg:last-child { transform: rotate(180deg); }
+.management-links { margin: 0 0 8px 18px; padding-left: 8px; border-left: 1px solid var(--line); }

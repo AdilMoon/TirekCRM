@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { expect, test } from './fixtures';
@@ -27,6 +28,7 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(async () => {
+  await db.workTimeMonth.deleteMany({ where: { organizationId } });
   await db.workTimeEntry.deleteMany({ where: { organizationId } });
   await db.auditEvent.deleteMany({ where: { organizationId } });
   await db.user.deleteMany({ where: { organizationId } });
@@ -34,7 +36,7 @@ test.afterAll(async () => {
   await db.$disconnect();
 });
 
-test('employee files actual time and owner approves it on mobile in Edge', async ({ page, context, baseURL }, testInfo) => {
+test('employee files overtime, owner closes the month and downloads CSV in Edge', async ({ page, context, baseURL }, testInfo) => {
   const url = baseURL ?? 'http://localhost:3000';
   const signIn = async (token: string) => {
     await context.clearCookies();
@@ -46,23 +48,31 @@ test('employee files actual time and owner approves it on mobile in Edge', async
   await page.getByRole('button', { name: 'Табель', exact: true }).click();
   await page.getByRole('button', { name: 'Записать фактическое время' }).click();
   const dialog = page.getByRole('dialog');
-  await dialog.getByLabel('Фактическое начало (Алматы)').fill('2025-11-08T09:00');
-  await dialog.getByLabel('Фактическое окончание (Алматы)').fill('2025-11-08T10:25');
+  await dialog.getByLabel('Вид времени').selectOption('OVERTIME');
+  await dialog.getByLabel('Фактическое начало (Алматы)').fill('2025-11-08T21:35');
+  await dialog.getByLabel('Фактическое окончание (Алматы)').fill('2025-11-08T23:00');
   await dialog.getByRole('button', { name: 'Отправить на проверку' }).click();
   await expect(page.locator('.work-time-entry')).toContainText('1 ч 25 мин');
   await expect(page.getByRole('button', { name: 'Подтвердить часы' })).toHaveCount(0);
   const entry = await db.workTimeEntry.findFirstOrThrow({ where: { employeeId } });
-  expect(entry.startsAt.toISOString()).toBe('2025-11-08T04:00:00.000Z');
+  expect(entry.startsAt.toISOString()).toBe('2025-11-08T16:35:00.000Z');
 
   await signIn(ownerToken);
   await page.getByRole('button', { name: 'Меню', exact: true }).click();
+  const management = page.getByRole('button', { name: 'Управление', exact: true });
+  await expect(page.getByRole('button', { name: 'Команда', exact: true })).toHaveCount(0);
+  await management.click();
+  await expect(management).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.getByRole('button', { name: 'Команда', exact: true })).toBeVisible();
+  await management.click();
   await page.getByRole('button', { name: 'Табель', exact: true }).click();
   await page.getByLabel('Месяц табеля').fill('2025-11');
   const record = page.locator('.work-time-entry').filter({ hasText: 'Employee QA' });
   await record.getByRole('button', { name: 'Подтвердить часы' }).click();
   await dialog.getByRole('button', { name: 'Подтвердить часы' }).click();
   await expect(record).toContainText('Часы подтверждены');
-  await expect(page.locator('.work-time-summary').getByText('1 ч 25 мин')).toBeVisible();
+  await expect(page.locator('.work-time-summary').getByText('1 ч 25 мин', { exact: true })).toHaveCount(2);
+  await expect(page.locator('.work-time-summary').getByText('1 ч 0 мин', { exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('timesheet-mobile-ru.png') });
   await page.getByRole('combobox', { name: 'Язык интерфейса' }).selectOption('kk');
@@ -70,9 +80,14 @@ test('employee files actual time and owner approves it on mobile in Edge', async
   await page.getByRole('combobox', { name: 'Интерфейс тілі' }).selectOption('en');
   await expect(record).toContainText('Hours approved');
   await expect(page.getByRole('heading', { name: 'Timesheet', exact: true })).toBeVisible();
-  await record.getByRole('button', { name: 'Void entry' }).click();
-  await dialog.getByLabel('Reason for decision').fill('Correct the original record');
-  await dialog.getByRole('button', { name: 'Void entry' }).click();
-  await expect(record).toContainText('Entry voided');
-  await expect(page.locator('.work-time-summary').getByText('0 h 0 min')).toHaveCount(2);
+  await page.getByRole('button', { name: 'Close month', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Confirm closure', exact: true }).click();
+  await expect(page.getByText('Month closed', { exact: false })).toBeVisible();
+  await expect(record.getByRole('button', { name: 'Void entry' })).toHaveCount(0);
+  const [csv] = await Promise.all([
+    page.waitForEvent('download'),
+    page.getByRole('button', { name: 'Download CSV for accounting' }).click(),
+  ]);
+  expect(csv.suggestedFilename()).toBe('tirek-timesheet-2025-11.csv');
+  expect(await readFile((await csv.path())!, 'utf8')).toContain('"Employee QA",85,85,60,0');
 });

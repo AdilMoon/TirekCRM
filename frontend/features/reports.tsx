@@ -7,7 +7,7 @@ import { useI18n } from '../i18n/provider';
 import { usePage } from '../lib/use-page';
 import { Pagination } from '../components/pagination';
 import { Empty,SearchBox,Stat } from '../components/ui';
-import { apiResponse } from '../lib/api';
+import { downloadCsv } from '../lib/download-csv';
 function useFilters(){
  const [q,setQ]=useState(''),[from,setFrom]=useState(''),[to,setTo]=useState(''),[page,setPage]=useState(1);
  return {q,from,to,page,setPage,invalid:!!from&&!!to&&from>to,
@@ -30,24 +30,14 @@ export function FinanceReport({revision,onOrder,onChanged}:{revision:unknown;onO
  const summary=result?.summary;
  const categories=kind==='INCOME'?{ORDER_PAYMENT:'Оплата заказа'}:kind==='REFUND'?{ORDER_REFUND:'Возврат оплаты'}:kind==='EXPENSE'||kind==='EXPENSE_REVERSAL'?expenseLabels:{ORDER_PAYMENT:'Оплата заказа',ORDER_REFUND:'Возврат оплаты',...expenseLabels};
  const reportError=filters.invalid?'Начало периода позже окончания':error;
- async function downloadCsv(){
+ async function exportReport(){
   if(filters.invalid||exporting)return;
   setExporting(true);
   setExportError('');
   try{
    const params=new URLSearchParams(query);
    params.delete('page');
-   const response=await apiResponse('/movements/export?'+params.toString(),{redirect:'error'});
-   if(!/^text\/csv(?:;|$)/i.test(response.headers.get('Content-Type')??''))throw new Error('Не удалось скачать отчёт');
-   const url=URL.createObjectURL(await response.blob());
-   const link=document.createElement('a');
-   link.href=url;
-   link.download='tirek-movements.csv';
-   document.body.appendChild(link);
-   try{link.click();}finally{
-    link.remove();
-    window.setTimeout(()=>URL.revokeObjectURL(url),1000);
-   }
+   await downloadCsv('/movements/export?'+params.toString(),'tirek-movements.csv');
   }catch(error){
    setExportError((error as Error).message);
   }finally{
@@ -60,7 +50,7 @@ export function FinanceReport({revision,onOrder,onChanged}:{revision:unknown;onO
  </section>
  <div className="report-export-bar">
   <p className="report-scope">{t('Итоги по всем операциям с выбранными фильтрами')}</p>
-  <button type="button" className="button secondary" disabled={filters.invalid||exporting} onClick={downloadCsv}>
+  <button type="button" className="button secondary" disabled={filters.invalid||exporting} onClick={exportReport}>
    <Download size={16} aria-hidden="true"/>{t(exporting?'Подготовка CSV…':'Скачать CSV')}
   </button>
  </div>

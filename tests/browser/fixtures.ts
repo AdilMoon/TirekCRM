@@ -1,7 +1,12 @@
-import {test as base} from '@playwright/test';
+import {test as base, type Page} from '@playwright/test';
 import {setTimeout as delay} from 'node:timers/promises';
 export {expect} from '@playwright/test';
 export type {BrowserContext} from '@playwright/test';
+
+export async function openManagement(page: Page, label = 'Управление') {
+ const group = page.getByRole('button', { name: label, exact: true });
+ if (await group.getAttribute('aria-expanded') === 'false') await group.click();
+}
 
 // The browser suite uses one loopback IP. Wait between scenarios for its real
 // server budget; never intercept, retry or weaken a response within a scenario.

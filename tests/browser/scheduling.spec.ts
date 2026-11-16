@@ -1,4 +1,4 @@
-import {test,expect} from './fixtures';
+import {openManagement,test,expect} from './fixtures';
 import 'dotenv/config';
 import {randomUUID,randomBytes,scryptSync} from 'node:crypto';
 import {PrismaClient} from '@prisma/client';
@@ -20,7 +20,7 @@ test.afterAll(async()=>{
 test('owner configures working hours sees explained recommendation retries lost response and reschedules on mobile',async({page})=>{
  test.setTimeout(90000);
  await page.goto('/');await page.getByLabel('Email',{exact:true}).fill(email);await page.getByLabel('Пароль',{exact:true}).fill(password);await page.getByRole('button',{name:'Войти в пространство',exact:true}).click();
- await page.getByRole('button',{name:'Команда',exact:true}).click();await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await expect(page.getByRole('button',{name:'Навыки и график',exact:true})).toBeInViewport();await page.setViewportSize({width:1280,height:900});await page.getByRole('button',{name:'Навыки и график',exact:true}).click();
+ await openManagement(page);await page.getByRole('button',{name:'Команда',exact:true}).click();await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await expect(page.getByRole('button',{name:'Навыки и график',exact:true})).toBeInViewport();await page.setViewportSize({width:1280,height:900});await page.getByRole('button',{name:'Навыки и график',exact:true}).click();
  for(const name of ['Айдана','Бекзат']){
   await page.locator('.schedule-members article').filter({hasText:name}).getByRole('button',{name:'Настроить',exact:true}).click();
   await page.getByLabel('Навыки через запятую',{exact:true}).fill('Уборка, окна');await page.getByLabel('Суббота',{exact:true}).check();await page.getByLabel('Воскресенье',{exact:true}).check();

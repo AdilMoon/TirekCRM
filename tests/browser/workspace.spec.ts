@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures';
+import {openManagement, test, expect } from './fixtures';
 import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
@@ -99,6 +99,7 @@ test('three languages persist and company details can be edited without losing f
   await page.getByLabel('Password', { exact:true }).fill(password);
   await page.getByRole('button', { name:'Sign in', exact:true }).click();
   await expect(page.getByRole('heading', { name:'Everything under control.' })).toBeVisible();
+  await openManagement(page,'Management');
   await page.getByRole('button', { name:'Settings', exact:true }).click();
   await page.getByLabel('Company name *', { exact:true }).fill('Updated Browser QA');
   await page.getByLabel('IIN/BIN', { exact:true }).fill('123456789012');
@@ -110,6 +111,7 @@ test('three languages persist and company details can be edited without losing f
   await page.reload();
   await expect(page.locator('html')).toHaveAttribute('lang','kk');
   await expect(page.locator('.eyebrow').first()).not.toContainText(/M[01][0-9]/);
+  await openManagement(page,'Басқару');
   await page.getByRole('button', { name:'Баптаулар', exact:true }).click();
   await expect(page.getByLabel('Компания атауы *', { exact:true })).toHaveValue('Updated Browser QA');
   await page.getByRole('button', { name:'Клиенттер', exact:true }).click();
@@ -186,7 +188,7 @@ test('server search, pagination, editable orders and audit history work together
   await page.getByRole('button',{name:'Сохранить',exact:true}).click();
   await expect(page.getByRole('dialog').getByRole('alert')).toHaveText('Сумма заказа не может быть меньше полученной оплаты');
   await page.getByRole('button',{name:'Отмена',exact:true}).click();
-  await page.getByRole('button',{name:'История действий',exact:true}).click();
+  await openManagement(page);await page.getByRole('button',{name:'История действий',exact:true}).click();
   await expect(page.locator('.audit-list')).toContainText('Оплата записана');
   await expect(page.locator('.audit-list')).toContainText('Заказ изменён');
   await expect(page.locator('.audit-list')).toContainText(/Стоимость:.*100.*125/);
@@ -200,7 +202,7 @@ test('owner invites an employee, assigns work and revokes access on mobile', asy
  await page.getByLabel('Email',{exact:true}).fill(email);
  await page.getByLabel('Пароль',{exact:true}).fill(password);
  await page.getByRole('button',{name:'Войти в пространство'}).click();
- await page.getByRole('button',{name:'Команда',exact:true}).click();
+ await openManagement(page);await page.getByRole('button',{name:'Команда',exact:true}).click();
  await page.getByRole('button',{name:'Пригласить сотрудника',exact:true}).click();
  await page.getByLabel('Имя сотрудника',{exact:true}).fill('Team colleague');
  await page.getByRole('dialog').getByLabel('Email',{exact:true}).fill(employeeEmail);
@@ -250,7 +252,7 @@ test('owner invites an employee, assigns work and revokes access on mobile', asy
   await page.getByRole('button',{name:'Обновить',exact:true}).click();
   await expect(page.getByRole('combobox',{name:'Изменить статус'})).toHaveValue('DONE');
   await page.screenshot({path:'test-results/team-tasks-desktop.png',fullPage:true});
-  await page.getByRole('button',{name:'Команда',exact:true}).click();
+  await openManagement(page);await page.getByRole('button',{name:'Команда',exact:true}).click();
   await page.getByRole('row').filter({hasText:employeeEmail}).getByRole('button',{name:'Отключить доступ'}).click();
   await page.getByRole('button',{name:'Подтвердить',exact:true}).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);

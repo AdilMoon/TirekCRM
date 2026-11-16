@@ -3,7 +3,13 @@ CRM для малого бизнеса Казахстана. Рабочая ло
 
 Приватный GitHub: [AdilMoon/TirekCRM](https://github.com/AdilMoon/TirekCRM). Порядок коммитов и проверок — в [git-workflow.md](docs/git-workflow.md).
 
-## Быстрый старт
+## Запуск в Docker
+
+Запустите Docker Desktop и из корня проекта выполните `npm run docker:up`.
+Compose соберёт приложение, применит миграции и запустит сайт на [https://localhost:9443](https://localhost:9443).
+При первом запуске [добавьте локальный сертификат Docker и создайте компанию](docs/docker.md).
+
+## Быстрый старт без Docker
 Откройте терминал в корне своей копии **TirekCRM**. На новом компьютере с Windows:
 ```sh
 npm ci
@@ -47,6 +53,7 @@ TirekCRM/
 ## Документация
 - [Функциональные блоки продукта — Word-отчет](docs/reports/functional-blocks-2026-10-24.docx), [текстовый исходник](docs/reports/functional-blocks-2026-10-24.md)
 - [Запуск и проверки](docs/development.md)
+- [Docker Compose, HTTPS и хранение данных](docs/docker.md)
 - [Установленный PostgreSQL на порту 5432](docs/local-postgresql.md)
 - [Архитектура и правила размещения файлов](docs/architecture.md)
 - [API, поиск и защита изменений](docs/backend-api.md)

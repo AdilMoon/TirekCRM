@@ -1,18 +1,99 @@
+name: tirekcrm-docker
+
+x-app: &app
+  image: tirekcrm-local:latest
+  pull_policy: never
+  init: true
+
+x-database-url: &database-url "postgresql://tirek:${TIREK_DOCKER_DB_PASSWORD:?Run npm run docker:setup}@postgres:5432/tirek"
+
 services:
   postgres:
-    image: postgres:18
+    image: postgres:17
+    restart: unless-stopped
     environment:
       POSTGRES_DB: tirek
-      POSTGRES_USER: tirek
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your shell}
-    ports:
-      - "127.0.0.1:54329:5432"
+      POSTGRES_PASSWORD: ${TIREK_DOCKER_POSTGRES_PASSWORD:?Run npm run docker:setup}
+      TIREK_APP_PASSWORD: ${TIREK_DOCKER_DB_PASSWORD:?Run npm run docker:setup}
     volumes:
-      - postgres_data:/var/lib/postgresql
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/docker-postgres-init.sh:/docker-entrypoint-initdb.d/tirek.sh:ro
+    networks: [database]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U tirek -d tirek"]
+      test: ["CMD-SHELL", "PGPASSWORD=\"$$TIREK_APP_PASSWORD\" psql -h 127.0.0.1 -U tirek -d tirek -tAc 'SELECT 1'"]
       interval: 5s
+      timeout: 4s
+      retries: 20
+
+  migrate:
+    <<: *app
+    build: .
+    command: ["npm", "run", "db:migrate"]
+    environment:
+      DATABASE_URL: *database-url
+    networks: [database]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    <<: *app
+    restart: unless-stopped
+    command: ["node", "backend/dist/main.js"]
+    environment:
+      DATABASE_URL: *database-url
+      API_HOST: 0.0.0.0
+      API_PORT: "4000"
+      WEB_ORIGIN: "https://localhost:${TIREK_DOCKER_HTTPS_PORT:-9443}"
+      REGISTRATION_ENABLED: "${TIREK_DOCKER_REGISTRATION_ENABLED:-true}"
+      MAIL_DELIVERY: ${TIREK_DOCKER_MAIL_DELIVERY:-disabled}
+      GMAIL_USER: ${TIREK_DOCKER_GMAIL_USER:-}
+      GMAIL_APP_PASSWORD: ${TIREK_DOCKER_GMAIL_APP_PASSWORD:-}
+      MAIL_ENCRYPTION_KEY: ${TIREK_DOCKER_MAIL_ENCRYPTION_KEY:-}
+      TELEGRAM_DELIVERY: ${TIREK_DOCKER_TELEGRAM_DELIVERY:-disabled}
+      TELEGRAM_BOT_TOKEN: ${TIREK_DOCKER_TELEGRAM_BOT_TOKEN:-}
+    networks: [default, database]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
       timeout: 5s
-      retries: 10
+      retries: 12
+
+  web:
+    <<: *app
+    restart: unless-stopped
+    working_dir: /app/frontend
+    command: ["node", "../node_modules/next/dist/bin/next", "start", "--hostname", "0.0.0.0", "--port", "3000"]
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${TIREK_DOCKER_HTTPS_PORT:-9443}:443"
+    volumes:
+      - ./scripts/Caddyfile.docker:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+
+networks:
+  database:
+    internal: true
+
 volumes:
   postgres_data:
+  caddy_data:

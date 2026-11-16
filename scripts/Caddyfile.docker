@@ -1,0 +1,25 @@
+{
+	admin off
+	persist_config off
+	skip_install_trust
+	auto_https disable_redirects
+	servers {
+		protocols h1 h2
+	}
+	pki {
+		ca local {
+			name "TirekCRM Docker Local CA"
+		}
+	}
+}
+
+https://localhost {
+	tls internal
+	header -Strict-Transport-Security
+	handle /api/* {
+		reverse_proxy api:4000
+	}
+	handle {
+		reverse_proxy web:3000
+	}
+}

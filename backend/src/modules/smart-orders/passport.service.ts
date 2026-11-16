@@ -3,7 +3,7 @@ import {randomBytes} from 'node:crypto';
 import sharp from 'sharp';
 import QRCode from 'qrcode';
 import type {Prisma} from '@prisma/client';
-import type {PassportPhotoInput} from '@tirek/contracts';
+import type {PassportPhotoInput,PassportPhotoVisibilityInput} from '@tirek/contracts';
 import {Database} from '../../database/database.service';
 import {serializable} from '../../common/transaction';
 import {digest} from '../../auth/session.guard';
@@ -43,8 +43,13 @@ export class PassportService {
  async manage(actor:Actor,id:string){
   return serializable(this.db.client,async tx=>{
    const access=await this.photoAccess(tx,actor,id);
-   const order=await tx.order.findFirst({where:{id,organizationId:actor.organizationId},include});
-   if(!order)throw new NotFoundException('Заказ не найден');return view(order,false,{id:actor.id,owner:access.owner});
+   const order=await tx.order.findFirst({where:{id,organizationId:actor.organizationId},include:{
+    ...include,
+    photos:{...include.photos,...(!access.owner?{where:{createdById:actor.id}}:{})},
+    _count:{select:{photos:true}},
+   }});
+   if(!order)throw new NotFoundException('Заказ не найден');
+   return {...view(order,false,{id:actor.id,owner:access.owner}),photoCount:order._count.photos};
   });
  }
  async publish(actor:Actor,id:string){
@@ -69,6 +74,11 @@ export class PassportService {
   });
  }
  async photo(actor:Actor,id:string,input:PassportPhotoInput,telegram?:{linkId:string;taskId:string}){
+  const checkAccess=async(tx:Prisma.TransactionClient)=>{
+   const access=await this.photoAccess(tx,actor,id,telegram);
+   if(input.shared&&!access.owner)throw new ForbiddenException('Недостаточно прав');
+   return access.order;
+  };
   const bytes=Buffer.from(input.image,'base64');
   if(bytes.length>300000||bytes.toString('base64')!==input.image)throw new BadRequestException('Не удалось обработать фото');
   const jpeg=bytes[0]===0xff&&bytes[1]===0xd8&&bytes[2]===0xff;
@@ -76,7 +86,7 @@ export class PassportService {
   const webp=bytes.toString('ascii',0,4)==='RIFF'&&bytes.toString('ascii',8,12)==='WEBP';
   if(!jpeg&&!png&&!webp)throw new BadRequestException('Не удалось обработать фото');
   // Check tenancy before doing CPU-intensive image decoding.
-  await this.db.client.$transaction(tx=>this.photoAccess(tx,actor,id,telegram));
+  await this.db.client.$transaction(checkAccess);
   let image:Buffer;
   try{
    const source=sharp(bytes,{limitInputPixels:12000000,failOn:'warning'}),meta=await source.metadata();
@@ -86,7 +96,7 @@ export class PassportService {
   if(image.length>200000)throw new BadRequestException('Фото слишком большое после обработки');
   const inputHash=digest(input.image+'|'+input.phase+'|'+input.shared);
   return serializable(this.db.client,async tx=>{
-   const {order}=await this.photoAccess(tx,actor,id,telegram);
+   const order=await checkAccess(tx);
    const old=await tx.orderPhoto.findUnique({where:{orderId_idempotencyKey:{orderId:id,idempotencyKey:input.idempotencyKey}}});
    if(old){if(old.inputHash!==inputHash||old.createdById!==actor.id)throw new ConflictException('Ключ операции уже использован');return {id:old.id};}
    if(await tx.orderPhoto.count({where:{orderId:id,organizationId:actor.organizationId}})>=6)throw new ConflictException('В паспорте можно сохранить до 6 фото');
@@ -94,6 +104,22 @@ export class PassportService {
    await tx.order.update({where:{id},data:{version:{increment:1}}});
    await this.audit.record(tx,actor,'ORDER',id,'ORDER_PHOTO_ADDED',{number:order.number,photoId:photo.id,phase:input.phase,shared:input.shared});
    return {id:photo.id};
+  });
+ }
+ setPhotoVisibility(actor:Actor,id:string,photoId:string,input:PassportPhotoVisibilityInput){
+  return serializable(this.db.client,async tx=>{
+   const order=await this.owner(tx,actor,id);
+   const photo=await tx.orderPhoto.findFirst({
+    where:{id:photoId,orderId:id,organizationId:actor.organizationId},
+    select:{shared:true},
+   });
+   if(!photo)throw new NotFoundException('Фото не найдено');
+   if(photo.shared===input.shared)return {ok:true};
+   if(order.version!==input.orderVersion)throw new ConflictException('Паспорт изменился. Обновите страницу');
+   await tx.orderPhoto.update({where:{id:photoId},data:{shared:input.shared}});
+   await tx.order.update({where:{id},data:{version:{increment:1}}});
+   await this.audit.record(tx,actor,'ORDER',id,'ORDER_PHOTO_VISIBILITY_CHANGED',{number:order.number,photoId,shared:input.shared});
+   return {ok:true};
   });
  }
  deletePhoto(actor:Actor,id:string,photoId:string){

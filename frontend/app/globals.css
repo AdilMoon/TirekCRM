@@ -80,3 +80,4 @@
 .amount.expense_reversal { color:var(--green); }
 .report-controls .tabs { flex-wrap:wrap; }
 @media(max-width:760px) { .financial-operation { padding:16px; } }
+.report-export-bar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}

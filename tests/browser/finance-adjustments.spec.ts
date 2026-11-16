@@ -3,6 +3,7 @@ import 'dotenv/config';
 import {PrismaClient} from '@prisma/client';
 import {PrismaPg} from '@prisma/adapter-pg';
 import {randomUUID,randomBytes,createHash} from 'node:crypto';
+import {readFile} from 'node:fs/promises';
 const db=new PrismaClient({adapter:new PrismaPg({connectionString:process.env.DATABASE_URL})});
 let organizationId:string,userId:string,token:string,paymentId:string,expenseId:string,orderId:string;
 async function login(context:BrowserContext){await context.addCookies([{name:'tirek_session',value:token,url:'http://localhost:3000',httpOnly:true,sameSite:'Lax'}]);}
@@ -19,6 +20,36 @@ test.afterEach(async()=>{
  await db.payment.deleteMany({where:{organizationId}});await db.expense.deleteMany({where:{organizationId}});await db.order.deleteMany({where:{organizationId}});await db.client.deleteMany({where:{organizationId}});await db.user.deleteMany({where:{organizationId}});await db.organization.deleteMany({where:{id:organizationId}});
 });
 test.afterAll(async()=>{await db.$disconnect();});
+
+test('filtered finance CSV downloads in Edge with exact values and handles an export refusal',async({page,context})=>{
+ await login(context);
+ await page.setViewportSize({width:390,height:844});
+ await page.goto('/');
+ await page.getByRole('button',{name:'Меню',exact:true}).click();
+ await page.getByRole('button',{name:'Финансы',exact:true}).click();
+ await page.getByRole('button',{name:'Поступления',exact:true}).click();
+ await page.getByLabel('Дата с',{exact:true}).fill('2020-01-01');
+ await page.getByLabel('Дата по',{exact:true}).fill('2020-01-01');
+ await page.getByRole('row').filter({hasText:'Refund QA original payment'}).waitFor();
+ const button=page.getByRole('button',{name:'Скачать CSV',exact:true});
+ const [download,request]=await Promise.all([
+  page.waitForEvent('download'),
+  page.waitForRequest(r=>new URL(r.url()).pathname==='/api/movements/export'),
+  button.click(),
+ ]);
+ expect(Object.fromEntries(new URL(request.url()).searchParams)).toEqual({q:'',from:'2020-01-01',to:'2020-01-01',kind:'INCOME'});
+ expect(download.suggestedFilename()).toBe('tirek-movements.csv');
+ const csv=await readFile((await download.path())!,'utf8');
+ expect(csv).toContain('100.25');
+ expect(csv).toContain('Refund QA original payment');
+ expect(csv).not.toContain('Reversal QA original expense');
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.route('**/api/movements/export?*',route=>route.fulfill({status:429,contentType:'application/json',body:'{}'}));
+ await button.click();
+ await expect(page.getByRole('alert').filter({hasText:'Слишком много запросов'})).toBeVisible();
+ await page.getByLabel('Дата с',{exact:true}).fill('2020-01-02');
+ await expect(button).toBeDisabled();
+});
 
 test('mobile refunds and expense reversals keep retry identity, history and RU KK EN layout',async({page,context},testInfo)=>{
  await login(context);await page.setViewportSize({width:390,height:844});await page.goto('/');await page.getByRole('button',{name:'Меню',exact:true}).click();await page.getByRole('button',{name:'Финансы',exact:true}).click();

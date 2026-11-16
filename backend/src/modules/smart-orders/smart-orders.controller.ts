@@ -1,6 +1,6 @@
-import {Controller,UseGuards,Post,Get,Delete,Body,Param,Req,ParseUUIDPipe,HttpCode} from '@nestjs/common';
+import {Controller,UseGuards,Post,Get,Patch,Delete,Body,Param,Req,ParseUUIDPipe,HttpCode} from '@nestjs/common';
 import {RouteConfig} from '@nestjs/platform-fastify';
-import {messagePreviewSchema,messageOrderSchema,passportTokenSchema,passportConfirmSchema,passportPhotoSchema} from '@tirek/contracts';
+import {messagePreviewSchema,messageOrderSchema,passportTokenSchema,passportConfirmSchema,passportPhotoSchema,passportPhotoVisibilitySchema} from '@tirek/contracts';
 import {SessionGuard,type AuthRequest} from '../../auth/session.guard';
 import {PublicAccess,EmployeeAccess} from '../../auth/access';
 import {MessageOrdersService} from './message-orders.service';
@@ -20,6 +20,10 @@ export class SmartOrdersController {
  revoke(@Req() r:AuthRequest,@Param('id',ParseUUIDPipe) id:string){return this.passports.revoke(r.user,id);}
  @Post('orders/:id/passport/photos') @EmployeeAccess() @RouteConfig({rateLimit:{max:10,timeWindow:'1 minute'}})
  photo(@Req() r:AuthRequest,@Param('id',ParseUUIDPipe) id:string,@Body() body:unknown){return this.passports.photo(r.user,id,passportPhotoSchema.parse(body));}
+ @Patch('orders/:id/passport/photos/:photoId/visibility')
+ visibility(@Req() r:AuthRequest,@Param('id',ParseUUIDPipe) id:string,@Param('photoId',ParseUUIDPipe) photoId:string,@Body() body:unknown){
+  return this.passports.setPhotoVisibility(r.user,id,photoId,passportPhotoVisibilitySchema.parse(body));
+ }
  @Delete('orders/:id/passport/photos/:photoId') @EmployeeAccess()
  deletePhoto(@Req() r:AuthRequest,@Param('id',ParseUUIDPipe) id:string,@Param('photoId',ParseUUIDPipe) photoId:string){return this.passports.deletePhoto(r.user,id,photoId);}
  @Post('passport/read') @PublicAccess() @HttpCode(200) @RouteConfig({rateLimit:{max:30,timeWindow:'1 minute'}})

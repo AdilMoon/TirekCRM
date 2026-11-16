@@ -30,6 +30,7 @@ export function WorkProfiles({close}:{close:()=>void}){
  return <ModalShell title={t('Навыки и график')} onClose={close} busy={busy} className="schedule-modal">
   {edit?<ProfileForm key={edit.id} member={edit} onBusy={setBusy} refresh={async()=>{setEdit(null);await load();}} close={()=>setEdit(null)} saved={async()=>{setEdit(null);setNotice('Профиль сохранён');await load();}}/>:<>
   <p className="form-note">{t('Настройте навыки и часы работы сотрудников перед подбором. Часовой пояс — Алматы.')}</p>
+  <p className="form-note">{t('Этот график задаёт доступность для назначений. Фактически отработанное время учитывайте отдельно.')}</p>
   {notice&&<p className="schedule-success" role="status">{t(notice)}</p>}
   {error&&<p className="form-error" role="alert">{t(error)} <button className="text-button" onClick={load}>{t('Обновить')}</button></p>}
   {!members&&!error&&<p role="status">{t('Загрузка…')}</p>}

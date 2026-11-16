@@ -84,16 +84,46 @@ test('Message intake and QR passports preserve permissions consistency privacy a
   await t.test('employees require a current active assignment and may delete only their own photos',async()=>{
    assert.equal((await req('/orders/'+created.orderId+'/passport',undefined,worker.cookie,'GET')).status,403);
    task=await db.businessTask.create({data:{organizationId:org,title:'Photo task',createdById:owner.id,assigneeId:worker.id,orderId:created.orderId}});
-   const r=await req('/orders/'+created.orderId+'/passport',undefined,worker.cookie,'GET');assert.equal(r.status,200);assert.equal(r.body.canPublish,false);assert.equal(r.body.photos[0].canDelete,false);
-   assert.equal((await req('/orders/'+created.orderId+'/passport/photos',photoInput,worker.cookie)).status,409);
+   const r=await req('/orders/'+created.orderId+'/passport',undefined,worker.cookie,'GET');assert.equal(r.status,200);assert.equal(r.body.canPublish,false);assert.equal(r.body.photos.length,0);assert.equal(r.body.photoCount,2);
+   assert.equal((await req('/orders/'+created.orderId+'/passport/photos',{...photoInput,idempotencyKey:randomUUID()},worker.cookie)).status,403);
    await db.user.update({where:{id:worker.id},data:{isActive:false}});
    await assert.rejects(()=>passports.manage(worker,created.orderId),e=>e.getStatus()===403);
    await db.user.update({where:{id:worker.id},data:{isActive:true}});
-   const upload=await req('/orders/'+created.orderId+'/passport/photos',{...photoInput,idempotencyKey:randomUUID(),phase:'AFTER'},worker.cookie);assert.equal(upload.status,201);employeePhoto=upload.body;
+   const upload=await req('/orders/'+created.orderId+'/passport/photos',{...photoInput,idempotencyKey:randomUUID(),phase:'AFTER',shared:false},worker.cookie);assert.equal(upload.status,201);employeePhoto=upload.body;
+   const assigned=await passports.manage(worker,created.orderId);assert.deepEqual(assigned.photos.map(photo=>photo.id),[employeePhoto.id]);assert.equal(assigned.photoCount,3);
    assert.equal((await req('/orders/'+created.orderId+'/passport/photos/'+ownPhoto.id,undefined,worker.cookie,'DELETE')).status,404);
    await db.businessTask.update({where:{id:task.id},data:{assigneeId:otherWorker.id}});
    assert.equal((await req('/orders/'+created.orderId+'/passport',undefined,worker.cookie,'GET')).status,403);
    assert.equal((await req('/orders/'+created.orderId+'/passport/photos',{...photoInput,idempotencyKey:randomUUID()},worker.cookie)).status,403);
+  });
+  await t.test('only the owner can share or hide with current version and atomic audit',async()=>{
+   const path='/orders/'+created.orderId+'/passport/photos/'+employeePhoto.id+'/visibility';
+   const v=await passports.manage(owner,created.orderId);
+   const show={shared:true,orderVersion:v.orderVersion};
+   assert.equal((await req(path,show,foreign.cookie,'PATCH')).status,404);
+   assert.equal((await req(path,show,otherWorker.cookie,'PATCH')).status,403);
+   assert.equal((await req(path,show,owner.cookie,'PATCH','https://bad-origin.invalid')).status,403);
+   assert.equal((await req(path,{...show,organizationId:org},owner.cookie,'PATCH')).status,400);
+   const foreignPhotoPath=path.replace(employeePhoto.id,randomUUID());
+   assert.equal((await req(foreignPhotoPath,show,owner.cookie,'PATCH')).status,404);
+   const broken=new PassportService({client:db},{record:async()=>{throw Error('audit fixture');}});
+   await assert.rejects(()=>broken.setPhotoVisibility(owner,created.orderId,employeePhoto.id,show),/audit fixture/);
+   assert.equal((await passports.manage(owner,created.orderId)).orderVersion,v.orderVersion);
+   assert.equal((await passports.read(token)).photos.some(photo=>photo.id===employeePhoto.id),false);
+   const repeated=await Promise.all([
+    passports.setPhotoVisibility(owner,created.orderId,employeePhoto.id,show),
+    passports.setPhotoVisibility(owner,created.orderId,employeePhoto.id,show),
+   ]);
+   assert.deepEqual(repeated,[{ok:true},{ok:true}]);
+   const published=await passports.read(token);
+   assert.equal(published.orderVersion,v.orderVersion+1);
+   assert.ok(published.photos.some(photo=>photo.id===employeePhoto.id));
+   assert.equal((await req(path,{shared:false,orderVersion:v.orderVersion},owner.cookie,'PATCH')).status,409);
+   assert.equal((await req(path,{shared:false,orderVersion:published.orderVersion},owner.cookie,'PATCH')).status,200);
+   assert.equal((await req(path,show,owner.cookie,'PATCH')).status,409);
+   assert.equal((await passports.read(token)).photos.some(photo=>photo.id===employeePhoto.id),false);
+   assert.ok((await passports.manage(owner,created.orderId)).photos.some(photo=>photo.id===employeePhoto.id));
+   assert.equal(await db.auditEvent.count({where:{organizationId:org,action:'ORDER_PHOTO_VISIBILITY_CHANGED'}}),2);
   });
   await t.test('confirmation is version-bound idempotent and invalidated by photo changes',async()=>{
    let v=(await req('/passport/read',{token})).body;

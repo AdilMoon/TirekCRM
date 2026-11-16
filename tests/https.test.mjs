@@ -5,10 +5,11 @@ import https from 'node:https';
 import { readFileSync } from 'node:fs';
 
 const ca = readFileSync('.local/caddy/pki/authorities/local/root.crt');
+const redirectPort = Number(process.env.TIREK_HTTP_REDIRECT_PORT ?? '8080');
 function request(path, { plain = false, ...options } = {}) {
   return new Promise((resolve, reject) => {
     const client = plain ? http : https;
-    const req = client.request(new URL(path, plain ? 'http://localhost:8080' : 'https://localhost:8443'), {
+    const req = client.request(new URL(path, plain ? `http://localhost:${redirectPort}` : 'https://localhost:8443'), {
       ...(plain ? {} : { ca }), ...options,
     }, response => {
       let body = '';

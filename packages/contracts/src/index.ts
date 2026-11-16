@@ -276,12 +276,18 @@ export const passportPhotoSchema=z.object({
  phase:z.enum(['BEFORE','AFTER']),shared:z.boolean(),idempotencyKey:z.uuid().transform(v=>v.toLowerCase()),
 }).strict();
 export type PassportPhotoInput=z.infer<typeof passportPhotoSchema>;
+export const passportPhotoVisibilitySchema=z.object({
+ shared:z.boolean(),
+ orderVersion:z.number().int().positive().max(2147483647),
+}).strict();
+export type PassportPhotoVisibilityInput=z.infer<typeof passportPhotoVisibilitySchema>;
 export interface PassportPhoto {id:string;phase:'BEFORE'|'AFTER';shared:boolean;image:string;canDelete?:boolean}
 export interface OrderPassport {
  companyName:string;number:number;title:string;status:Stage;dueDate:string|null;
  orderVersion:number;revision:number;expiresAt:string|null;active:boolean;confirmedAt:string|null;
  photos:PassportPhoto[];
  canPublish?:boolean;
+ photoCount?:number;
 }
 export interface PassportLinkResult {url:string;qr:string;expiresAt:string}
 

@@ -18,7 +18,12 @@ test.afterAll(async()=>{
 async function png(color:string){return sharp({create:{width:600,height:380,channels:3,background:color}}).png().toBuffer();}
 test('message review survives lost response then publishes photos and accepts a versioned passport',async({page})=>{
  test.setTimeout(90000);
- await page.goto('/');await page.getByLabel('Email',{exact:true}).fill(email);await page.getByLabel('Пароль',{exact:true}).fill(password);await page.getByRole('button',{name:'Войти в пространство',exact:true}).click();
+ const entry=await page.goto('/');
+ expect(entry?.headers()['content-security-policy']).toContain("frame-ancestors 'none'");
+ expect(entry?.headers()['x-frame-options']).toBe('DENY');
+ expect(entry?.headers()['referrer-policy']).toBe('no-referrer');
+ expect(entry?.headers()['x-robots-tag']).toContain('noindex');
+ await page.getByLabel('Email',{exact:true}).fill(email);await page.getByLabel('Пароль',{exact:true}).fill(password);await page.getByRole('button',{name:'Войти в пространство',exact:true}).click();
  await page.getByRole('button',{name:/Из сообщения в заказ/}).click();
  await page.getByLabel('Сообщение клиента',{exact:true}).fill('Нужна уборка квартиры завтра в 15:00, бюджет 25 000 ₸. Меня зовут Айдана, +7 700 111 22 33.');
  await page.getByRole('button',{name:'Разобрать сообщение',exact:true}).click();
@@ -39,9 +44,20 @@ test('message review survives lost response then publishes photos and accepts a 
  for(const [name,phase,shared,color] of [['before.png','BEFORE',true,'#e5af77'],['after.png','AFTER',true,'#398a76'],['private.png','AFTER',false,'#8b96b5']] as const){
   await page.getByLabel('Этап фото',{exact:true}).selectOption(phase);
   await page.getByLabel('Фотография',{exact:true}).setInputFiles({name,mimeType:'image/png',buffer:await png(color)});
-  await page.getByLabel('Показать это фото клиенту по ссылке',{exact:true}).setChecked(shared);
+  const photos=page.locator('.passport-photos figure');
+  const existing=await photos.count();
   await page.getByRole('button',{name:'Загрузить фото',exact:true}).click();
-  await expect(page.getByRole('button',{name:'Загрузить фото',exact:true})).toBeDisabled();
+  await expect(photos).toHaveCount(existing+1);
+  const card=photos.last();
+  await expect(card.getByText('Только в CRM')).toBeVisible();
+  if(shared){
+   await card.getByRole('button',{name:'Показать по ссылке',exact:true}).click();
+   const confirm=card.getByRole('button',{name:'Подтвердить публикацию фото',exact:true});
+   await expect(confirm).toBeDisabled();
+   await card.getByLabel('Я проверил снимок и могу открыть его для получателей ссылки.').check();
+   await confirm.click();
+   await expect(card.getByText('Выбрано для публикации')).toBeVisible();
+  }
  }
  await expect(page.locator('.passport-photos figure')).toHaveCount(3);
  await page.getByRole('button',{name:'Создать QR-паспорт',exact:true}).click();
@@ -63,6 +79,16 @@ test('message review survives lost response then publishes photos and accepts a 
   await client.getByRole('combobox',{name:'Язык интерфейса'}).selectOption('kk');await expect(client.getByRole('heading',{name:'Нәтижені растау',exact:true})).toBeVisible();
   await client.getByRole('combobox',{name:'Интерфейс тілі'}).selectOption('en');await expect(client.getByRole('heading',{name:'Confirm the result',exact:true})).toBeVisible();
   await client.getByRole('combobox',{name:'Interface language'}).selectOption('ru');
+  const hide=page.locator('.passport-photos figure').first().getByRole('button',{name:'Скрыть с паспорта'});
+  await hide.click();
+  const stale=page.getByRole('dialog').getByRole('alert');
+  await expect(stale).toContainText('Паспорт изменился. Обновите страницу');
+  await stale.getByRole('button',{name:'Обновить',exact:true}).click();
+  await hide.click();
+  await expect(page.locator('.passport-photos figure').first().getByText('Только в CRM')).toBeVisible();
+  await client.getByRole('button',{name:'Обновить',exact:true}).click();
+  await expect(client.locator('.passport-photos figure')).toHaveCount(1);
+  await expect(client.getByText('Вы подтвердили выполнение',{exact:false})).toHaveCount(0);
   await page.getByRole('button',{name:'Отозвать ссылку',exact:true}).click();await expect(page.getByText('Публичная ссылка не активна',{exact:false})).toBeVisible();
   await client.getByRole('button',{name:'Обновить',exact:true}).click();await expect(client.locator('main').getByRole('alert')).toContainText('Ссылка недоступна или срок истёк');await expect(client.locator('.passport-photos')).toHaveCount(0);
  }catch(e){await client.screenshot({path:'test-results/passport-client-failure.png',fullPage:true});throw e;}finally{await client.close();}
@@ -76,6 +102,7 @@ test('assigned employee adds photo on mobile without permission to publish and l
  await expect(page.getByLabel('Фотография',{exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'Создать QR-паспорт',exact:true})).toHaveCount(0);
  await page.getByLabel('Фотография',{exact:true}).setInputFiles({name:'employee.png',mimeType:'image/png',buffer:await png('#26705c')});
  await page.getByRole('button',{name:'Загрузить фото',exact:true}).click();await expect(page.locator('.passport-photos figure')).toHaveCount(1);
+ await expect(page.getByRole('button',{name:'Показать по ссылке',exact:true})).toHaveCount(0);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  await page.screenshot({path:'test-results/employee-passport-photo.png',fullPage:true,animations:'disabled'});
  await db.businessTask.update({where:{id:task.id},data:{assigneeId:ownerId}});

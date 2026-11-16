@@ -22,7 +22,7 @@ https://localhost:8443 {
 	header -Strict-Transport-Security
 }
 
-http://localhost:8080 {
+http://localhost:{$TIREK_HTTP_REDIRECT_PORT:8080} {
 	# Never build the redirect from a client-controlled Host header.
 	redir https://localhost:8443{uri} 308
 }

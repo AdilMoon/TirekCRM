@@ -1,12 +1,13 @@
 'use client';
 import {FinancialOperationDialog} from './financial-operation';
 import { useState } from 'react';
-import { ArrowDownLeft,ArrowUpRight,FileText,Wallet } from 'lucide-react';
+import { ArrowDownLeft,ArrowUpRight,Download,FileText,Wallet } from 'lucide-react';
 import { expenseLabels,type Movement,type MovementPage,type DocumentRecord } from '@tirek/contracts';
 import { useI18n } from '../i18n/provider';
 import { usePage } from '../lib/use-page';
 import { Pagination } from '../components/pagination';
 import { Empty,SearchBox,Stat } from '../components/ui';
+import { apiResponse } from '../lib/api';
 function useFilters(){
  const [q,setQ]=useState(''),[from,setFrom]=useState(''),[to,setTo]=useState(''),[page,setPage]=useState(1);
  return {q,from,to,page,setPage,invalid:!!from&&!!to&&from>to,
@@ -22,16 +23,48 @@ export function FinanceReport({revision,onOrder,onChanged}:{revision:unknown;onO
  const {t,formatMoney,formatDate}=useI18n(),filters=useFilters();
  const [kind,setKind]=useState(''),[category,setCategory]=useState('');
  const [selected,setSelected]=useState<{id:string;kind:'INCOME'|'EXPENSE'}|null>(null);
+ const [exporting,setExporting]=useState(false);
+ const [exportError,setExportError]=useState('');
  const query=new URLSearchParams({...filters.params,...(kind?{kind}:{}),...(category?{category}:{})}).toString();
  const {result,error,busy,retry}=usePage<Movement,MovementPage>('/movements/search',query,revision);
  const summary=result?.summary;
  const categories=kind==='INCOME'?{ORDER_PAYMENT:'Оплата заказа'}:kind==='REFUND'?{ORDER_REFUND:'Возврат оплаты'}:kind==='EXPENSE'||kind==='EXPENSE_REVERSAL'?expenseLabels:{ORDER_PAYMENT:'Оплата заказа',ORDER_REFUND:'Возврат оплаты',...expenseLabels};
  const reportError=filters.invalid?'Начало периода позже окончания':error;
+ async function downloadCsv(){
+  if(filters.invalid||exporting)return;
+  setExporting(true);
+  setExportError('');
+  try{
+   const params=new URLSearchParams(query);
+   params.delete('page');
+   const response=await apiResponse('/movements/export?'+params.toString(),{redirect:'error'});
+   if(!/^text\/csv(?:;|$)/i.test(response.headers.get('Content-Type')??''))throw new Error('Не удалось скачать отчёт');
+   const url=URL.createObjectURL(await response.blob());
+   const link=document.createElement('a');
+   link.href=url;
+   link.download='tirek-movements.csv';
+   document.body.appendChild(link);
+   try{link.click();}finally{
+    link.remove();
+    window.setTimeout(()=>URL.revokeObjectURL(url),1000);
+   }
+  }catch(error){
+   setExportError((error as Error).message);
+  }finally{
+   setExporting(false);
+  }
+ }
  return <div className="report-space"><section className="panel report-controls">
  <div className="table-toolbar"><div className="tabs">{[['','Все операции'],['INCOME','Поступления'],['EXPENSE','Расходы'],['REFUND','Возвраты'],['EXPENSE_REVERSAL','Сторнирования']].map(([value,label])=><button key={value} className={kind===value?'selected':''} onClick={()=>{setKind(value);setCategory('');filters.setPage(1);}}>{t(label)}</button>)}</div><SearchBox value={filters.q} setValue={filters.setQ} placeholder={t('Описание, заказ или клиент')}/></div>
  <div className="report-filter-row"><Period filters={filters} reset={()=>{filters.reset();setKind('');setCategory('');}}/><label className="filter-label">{t('Категория')}<select value={category} onChange={e=>{setCategory(e.target.value);filters.setPage(1);}}><option value="">{t('Все категории')}</option>{Object.entries(categories).map(([key,label])=><option key={key} value={key}>{t(label)}</option>)}</select></label></div>
  </section>
- <p className="report-scope">{t('Итоги по всем операциям с выбранными фильтрами')}</p>
+ <div className="report-export-bar">
+  <p className="report-scope">{t('Итоги по всем операциям с выбранными фильтрами')}</p>
+  <button type="button" className="button secondary" disabled={filters.invalid||exporting} onClick={downloadCsv}>
+   <Download size={16} aria-hidden="true"/>{t(exporting?'Подготовка CSV…':'Скачать CSV')}
+  </button>
+ </div>
+ {exportError&&<p className="alert" role="alert">{t(exportError)}</p>}
  <div className="stats-grid report-stats" aria-busy={busy}>
  <Stat label={t('Поступления')} value={summary?formatMoney(summary.received):'—'} detail={t('С учётом возвратов в выборке')} icon={<ArrowDownLeft size={19}/>}/>
  <Stat label={t('Расходы')} value={summary?formatMoney(summary.expenses):'—'} detail={t('С учётом сторнирований в выборке')} icon={<ArrowUpRight size={19}/>}/>

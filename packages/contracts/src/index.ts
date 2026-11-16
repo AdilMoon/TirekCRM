@@ -1,4 +1,5 @@
 import { z } from 'zod';
+export * from './work-time';
 
 export const stages = ['NEW', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'] as const;
 export type Stage = typeof stages[number];
@@ -86,7 +87,7 @@ export const listQuerySchema = z.object({
 });
 export const orderQuerySchema = listQuerySchema.extend({ status: z.enum(stages).optional() });
 export const auditQuerySchema = listQuerySchema.omit({ q:true }).extend({
-  entityType: z.enum(['ORDER','CLIENT','ORGANIZATION','PAYMENT','EXPENSE','DOCUMENT','TASK','TEAM','ACCOUNT','PRIVACY_REQUEST']).optional(),
+  entityType: z.enum(['ORDER','CLIENT','ORGANIZATION','PAYMENT','EXPENSE','DOCUMENT','TASK','TEAM','ACCOUNT','PRIVACY_REQUEST','WORK_TIME']).optional(),
   entityId: z.uuid().optional(),
 });
 export const updateOrderSchema = orderSchema.extend({ version:z.number().int().min(1) });

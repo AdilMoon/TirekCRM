@@ -15,6 +15,7 @@ import { Brand, Stat, Empty } from '../components/ui';
 import { WorkspaceNavigation } from '../components/workspace-navigation';
 import { Team } from '../features/team';
 import { Tasks } from '../features/tasks';
+import { WorkTime } from '../features/work-time';
 import { EmployeeWorkspace } from '../features/employee-workspace';
 import { Login } from '../features/login';
 import { OrdersTable } from '../features/orders-table';
@@ -36,6 +37,7 @@ const navigation = [
   { id: 'documents', label: t("Документы"), icon: FileText },
 { id:'tasks',label:t('Задачи'),icon:CheckCircle2 },
 { id:'team',label:t('Команда'),icon:Users },
+{ id:'workTime',label:t('Табель'),icon:Clock3 },
 { id:'history', label:t('История действий'), icon:History },
 { id:'settings', label:t("Настройки"), icon:Settings2 },
 ] as const;
@@ -96,8 +98,8 @@ const navigation = [
     <div className="main-shell"><header className="topbar"><div className="breadcrumb"><button className="icon-button mobile-menu" aria-label={t("Меню")} aria-expanded={mobileMenu} aria-haspopup="dialog" aria-controls={mobileMenu ? "workspace-navigation" : undefined} onClick={() => setMobileMenu(!mobileMenu)}><Menu size={22} /></button><span>{t("Рабочее пространство")}</span><ChevronRight size={14} /><strong>{selectedNav.label}</strong></div><div className="topbar-right"><NotificationCenter key={user.id} userId={user.id} onSessionExpired={()=>{setUser(null);setData(emptyData);}}/><LanguageSwitcher /><span className="demo-pill">{user.organization.currency}</span><span className="top-date"><CalendarDays size={16} />{formatDate(new Date(), { day: 'numeric', month: 'short', timeZone: 'Asia/Almaty' })}</span></div></header>
     <main>
       {error && <div className="alert" role="alert">{t(error)}<button onClick={() => refresh().catch(e => setError(e.message))}>{t("Обновить")}</button></div>}
-      <div className="page-heading"><div><p className="eyebrow">{section === 'overview' ? day : t("{0} / РАБОЧЕЕ ПРОСТРАНСТВО", user.organization.name)}</p><h1>{section === 'overview' ? t("Всё под контролем.") : selectedNav.label}</h1><p className="page-subtitle">{({ overview: t("Ваш бизнес в деталях. Главное — на одном экране."), clients: t("Люди и компании, с которыми вы работаете."), orders: t("От первого обращения до выполненной работы."), finances: t("Поступления и расходы без потерянных деталей."), documents: t("Документы, связанные с вашими заказами."), tasks:t('Договорённости, исполнители и сроки в одном месте.'),team:t('Люди, с которыми вы строите бизнес.'),history:t('Кто и когда изменил данные'), settings:t("Данные компании для вашего пространства и документов.") })[section]}</p></div>
-      {!['settings','history','tasks','team'].includes(section) && <div className="heading-actions">{section==='documents'&&<button className="button secondary" onClick={()=>setModal({kind:'invoice'})}><Plus size={17}/>{t('Создать счёт')}</button>}{section === 'finances' && <button className="button secondary" onClick={() => setModal({ kind: 'payment' })}><Plus size={17} />{t("Оплата")}</button>}<button className="button primary" onClick={() => setModal({ kind: section === 'clients' ? 'client' : section === 'finances' ? 'expense' : section === 'documents' ? 'document' : 'order' })}><Plus size={18} />{section === 'clients' ? t("Новый клиент") : section === 'finances' ? t("Добавить расход") : section === 'documents' ? t("Создать акт") : t("Новый заказ")}</button></div>}</div>
+      <div className="page-heading"><div><p className="eyebrow">{section === 'overview' ? day : t("{0} / РАБОЧЕЕ ПРОСТРАНСТВО", user.organization.name)}</p><h1>{section === 'overview' ? t("Всё под контролем.") : selectedNav.label}</h1><p className="page-subtitle">{({ overview: t("Ваш бизнес в деталях. Главное — на одном экране."), clients: t("Люди и компании, с которыми вы работаете."), orders: t("От первого обращения до выполненной работы."), finances: t("Поступления и расходы без потерянных деталей."), documents: t("Документы, связанные с вашими заказами."), tasks:t('Договорённости, исполнители и сроки в одном месте.'),team:t('Люди, с которыми вы строите бизнес.'),workTime:t('Запись и проверка фактически отработанных часов.'),history:t('Кто и когда изменил данные'), settings:t("Данные компании для вашего пространства и документов.") })[section]}</p></div>
+      {!['settings','history','tasks','team','workTime'].includes(section) && <div className="heading-actions">{section==='documents'&&<button className="button secondary" onClick={()=>setModal({kind:'invoice'})}><Plus size={17}/>{t('Создать счёт')}</button>}{section === 'finances' && <button className="button secondary" onClick={() => setModal({ kind: 'payment' })}><Plus size={17} />{t("Оплата")}</button>}<button className="button primary" onClick={() => setModal({ kind: section === 'clients' ? 'client' : section === 'finances' ? 'expense' : section === 'documents' ? 'document' : 'order' })}><Plus size={18} />{section === 'clients' ? t("Новый клиент") : section === 'finances' ? t("Добавить расход") : section === 'documents' ? t("Создать акт") : t("Новый заказ")}</button></div>}</div>
       {['overview','orders'].includes(section)&&<button className="message-launch" onClick={()=>setMessageOpen(true)}><span><strong>{t('Из сообщения в заказ')}</strong><small>{t('Вставьте обращение и проверьте готовые поля')}</small></span><ArrowRight size={24}/></button>}
       {section === 'overview' && dashboard && <>
         {dashboard.clientsCount===0&&<GettingStarted onClient={()=>setModal({kind:'client'})} onSettings={()=>navigate('settings')} onTeam={()=>navigate('team')}/>}
@@ -117,6 +119,7 @@ const navigation = [
       {section === 'clients' && <ClientDirectory revision={data} onSelect={client=>setModal({kind:'client',client})}/>}
       {section === 'tasks' && <Tasks user={user}/>}
       {section === 'team' && <Team/>}
+      {section === 'workTime' && <WorkTime owner/>}
       {section === 'history' && <AuditTrail revision={data}/>}
       {section === 'finances' && <FinanceReport revision={data} onChanged={()=>{refresh().catch(e=>setError(e.message));}} onOrder={id=>openOrder({id})}/>}
       {section === 'documents' && <DocumentDirectory revision={data}/>}

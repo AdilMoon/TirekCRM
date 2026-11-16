@@ -43,6 +43,7 @@ model Organization {
   payments     Payment[]
   expenses     Expense[]
   documents    Document[]
+  workTimeEntries WorkTimeEntry[]
 }
 model User {
   id             String @id @default(uuid()) @db.Uuid
@@ -64,7 +65,35 @@ model User {
   bookings WorkBooking[]
   telegramLink TelegramLink?
   telegramPairing TelegramPairing?
+  workTimeEntries WorkTimeEntry[] @relation("WorkTimeEmployee")
+  enteredWorkTime WorkTimeEntry[] @relation("WorkTimeCreator")
   @@unique([id, organizationId])
+}
+enum WorkTimeStatus {
+  SUBMITTED
+  APPROVED
+  REJECTED
+  VOIDED
+}
+model WorkTimeEntry {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  organization Organization @relation(fields: [organizationId], references: [id])
+  employeeId String @db.Uuid
+  employee User @relation("WorkTimeEmployee", fields: [employeeId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  createdById String @db.Uuid
+  createdBy User @relation("WorkTimeCreator", fields: [createdById, organizationId], references: [id, organizationId], onDelete: Restrict)
+  startsAt DateTime
+  endsAt DateTime
+  status WorkTimeStatus @default(SUBMITTED)
+  decisionNote String @default("") @db.VarChar(300)
+  version Int @default(1)
+  idempotencyKey String @db.Uuid
+  createdAt DateTime @default(now())
+
+  @@unique([organizationId, createdById, idempotencyKey])
+  @@index([organizationId, startsAt, id])
+  @@index([organizationId, employeeId, startsAt, id])
 }
 model Session {
   id String @unique @default(uuid()) @db.Uuid

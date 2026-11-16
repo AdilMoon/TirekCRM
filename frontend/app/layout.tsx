@@ -4,6 +4,7 @@ import './mobile.css';
 import './smart-orders.css';
 import './scheduling.css';
 import './telegram.css';
+import './work-time.css';
 import { LanguageProvider } from '../i18n/provider';
 export const metadata: Metadata = { title: 'Tirek — рабочее пространство бизнеса', description: 'Клиенты, заказы, документы и финансы малого бизнеса в одном месте.' };
 export default function RootLayout({ children }: { children: React.ReactNode }) {

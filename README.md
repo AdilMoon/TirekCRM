@@ -52,6 +52,7 @@ TirekCRM/
 - [API, поиск и защита изменений](docs/backend-api.md)
 - [Команда, права, приглашения и задачи](docs/team-and-tasks.md)
 - [Умное распределение, навыки и рабочие часы](docs/employee-scheduling.md)
+- [Табель фактического времени и подтверждение записей](docs/work-time.md)
 - [Telegram: задачи сотрудников и фото результата](docs/employee-telegram.md)
 - [Обсуждения задач](docs/task-discussions.md)
 - [Личные уведомления](docs/notifications.md)

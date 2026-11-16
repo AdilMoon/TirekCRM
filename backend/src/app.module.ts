@@ -14,5 +14,6 @@ import { CrmModule } from './modules/crm/crm.module';
 import { AuthModule } from './auth/auth.module';
 import { DatabaseModule } from './database/database.module';
 import { HealthController } from './health.controller';
-@Module({imports:[TelegramModule,SchedulingModule,SmartOrdersModule,FinanceModule,PrivacyRequestsModule,DocumentsModule,NotificationsModule,OnboardingModule,DatabaseModule,AuthModule,CrmModule,TeamModule,TasksModule,ReportsModule],controllers:[HealthController]})
+import { WorkTimeModule } from './modules/work-time/work-time.module';
+@Module({imports:[TelegramModule,WorkTimeModule,SchedulingModule,SmartOrdersModule,FinanceModule,PrivacyRequestsModule,DocumentsModule,NotificationsModule,OnboardingModule,DatabaseModule,AuthModule,CrmModule,TeamModule,TasksModule,ReportsModule],controllers:[HealthController]})
 export class AppModule {}

@@ -1,0 +1,75 @@
+.employee-work-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+.work-time .panel-heading { align-items: flex-start; }
+.work-time-body { padding: 0 24px 20px; }
+.work-time-body > .form-note { margin-bottom: 16px; }
+.work-time-filters, .work-time-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 168px), 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.work-time-filters label {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-width: 0;
+  color: #425464;
+  font-size: 12px;
+  font-weight: 600;
+}
+.work-time-filters :is(input, select) {
+  min-width: 0;
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #fff;
+  color: #253743;
+  font: inherit;
+}
+.work-time-summary > div {
+  display: grid;
+  gap: 8px;
+  padding: 15px;
+  border: 1px solid #dce8e0;
+  border-radius: 10px;
+  background: #f4f9f6;
+  color: #205746;
+}
+.work-time-summary > div + div {
+  border-color: #e9e2ce;
+  background: #faf8f0;
+  color: #73562a;
+}
+.work-time-summary span { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.work-time-summary strong { font-size: clamp(18px, 2.6vw, 27px); font-variant-numeric: tabular-nums; }
+.work-time-entries { display: grid; gap: 10px; }
+.work-time-entry {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px 18px;
+  align-items: start;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.work-time-entry p { margin: 4px 0 0; line-height: 1.55; }
+.work-time-entry-status { display: grid; justify-items: end; gap: 6px; }
+.work-time-badge { padding: 4px 9px; border-radius: 16px; color: #445762; background: #edf2f5; font-size: 11px; }
+.work-time-badge[data-status="APPROVED"] { color: #205746; background: #e3f0e8; }
+.work-time-badge[data-status="SUBMITTED"] { color: #73562a; background: #f7efdb; }
+.work-time-actions { display: flex; flex-wrap: wrap; gap: 8px; grid-column: 1 / -1; }
+@media (max-width: 550px) {
+  .work-time .panel-heading { display: grid; gap: 12px; }
+  .work-time-body { padding: 0 14px 16px; }
+  .work-time-entry { grid-template-columns: minmax(0, 1fr); }
+  .work-time-entry-status { justify-items: start; }
+}

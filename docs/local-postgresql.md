@@ -18,6 +18,19 @@
 
 Для pgAdmin зарегистрируйте сервер с Host/Port из таблицы, Maintenance database `tirek` и Username `tirek`; пароль вводится локально. Таблицы находятся в `Databases → tirek → Schemas → public → Tables`.
 
+## Доступ к порту только с этого компьютера
+
+16.11.2026 в конфигурации службы PostgreSQL 17 установлен `listen_addresses = 'localhost'` и выполнен перезапуск. На 5432 проверены только `127.0.0.1` и `::1`. Правила pg_hba.conf допускают SCRAM-аутентификацию с loopback. Клиент TirekCRM подтвердил подключение к базе после перезапуска. Ограничение относится к службе на этом компьютере.
+
+Для описанной установки повторная настройка выполняется из PowerShell с правами администратора:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\postgres-loopback.ps1
+Get-NetTCPConnection -LocalPort 5432 -State Listen
+```
+
+Скрипт проверяет имя службы, каталог данных и слушающий процесс. Перед перезапуском он сохраняет резервную копию конфигурации рядом с `postgresql.conf`. Для установки с другим каталогом, службой или переопределениями конфигурацию проверяет администратор. [Параметр listen_addresses в PostgreSQL 17](https://www.postgresql.org/docs/17/runtime-config-connection.html)
+
 ## Запуск
 
 Служба PostgreSQL настроена на автоматический запуск. Проверить её в PowerShell:

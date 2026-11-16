@@ -30,6 +30,9 @@ test.beforeAll(async () => {
     organizationId, clientId: client.id, number: 1, title: 'Монтаж витрины QA', total: '1000.00',
   } });
   orderId = order.id;
+  await db.expense.create({ data: {
+    organizationId, orderId, amount: '100.25', description: 'Материалы QA', category: 'MATERIALS', idempotencyKey: randomUUID(),
+  } });
   await db.businessTask.create({ data: {
     organizationId, title: 'Подготовить витрину QA', orderId, assigneeId: employee.id, createdById: supervisor.id, status: 'DONE',
   } });
@@ -38,6 +41,7 @@ test.beforeAll(async () => {
 test.afterAll(async () => {
   await db.workTimeEntry.deleteMany({ where: { organizationId } });
   await db.businessTask.deleteMany({ where: { organizationId } });
+  await db.expense.deleteMany({ where: { organizationId } });
   await db.order.deleteMany({ where: { organizationId } });
   await db.client.deleteMany({ where: { organizationId } });
   await db.auditEvent.deleteMany({ where: { organizationId } });
@@ -46,7 +50,7 @@ test.afterAll(async () => {
   await db.$disconnect();
 });
 
-test('employee logs time from a task and owner compares approved time with the plan and exports the overrun', async ({ page, context, baseURL }, testInfo) => {
+test('employee logs time and owner verifies the overrun report and order profitability', async ({ page, context, baseURL }, testInfo) => {
   test.setTimeout(60000);
   const url = baseURL ?? 'http://localhost:3000';
   async function signIn(value: string) {
@@ -99,4 +103,21 @@ test('employee logs time from a task and owner compares approved time with the p
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   expect(await dialog.locator('.effort-scroll').evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('order-effort-mobile.png') });
+
+  await dialog.getByRole('button', { name: 'Закрыть', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Закрыть', exact: true }).click();
+  await page.getByRole('button', { name: /^Монтаж витрины QA/ }).click();
+  await dialog.getByRole('button', { name: 'Прибыльность', exact: true }).click();
+  await expect(dialog.getByText('Укажите фактическую ставку.', { exact: false })).toBeVisible();
+  await dialog.getByLabel('Плановая ставка за час, ₸').fill('150,50');
+  await dialog.getByLabel('Плановые расходы, ₸').fill('100');
+  await dialog.getByLabel('Общая фактическая ставка за час, ₸').fill('200');
+  await dialog.getByText('Индивидуальные ставки сотрудников', { exact: true }).click();
+  await dialog.getByLabel(/Айдана QA/).fill('160,10');
+  await dialog.getByRole('button', { name: 'Сохранить бюджет и ставки' }).click();
+  const margin = dialog.getByRole('row', { name: /Маржа/ });
+  await expect(margin.getByRole('cell')).toHaveText(['59,90%', '49,95%']);
+  await expect(dialog.getByRole('row', { name: /Себестоимость/ })).toContainText('500,50');
+  expect(await dialog.locator('.effort-scroll').evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath('order-profitability-mobile.png') });
 });

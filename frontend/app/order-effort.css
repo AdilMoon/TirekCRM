@@ -13,6 +13,17 @@
 .effort-table tbody td { min-width: 76px; }
 .effort-table .text-button { display: block; text-align: left; margin-bottom: 4px; overflow-wrap: anywhere; }
 .effort-filters { display: flex; justify-content: space-between; flex-wrap: wrap; align-items: center; gap: 10px; }
+.profitability-revenue { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; font-size: 13px; margin: 9px 0 5px; }
+.profitability-revenue strong { font-size: 18px; }
+.profitability-table { table-layout: fixed; }
+.profitability-table th, .profitability-table td { color: #405762; overflow-wrap: anywhere; white-space: normal; }
+.profitability-table th:first-child { width: 38%; }
+.profitability-table tr:nth-last-child(-n+3) td { font-weight: 650; }
+.profitability-table td.effort-overrun { color: #a73c2c; }
+.profitability-notes { display: grid; gap: 6px; }
+.profitability-rates { background: #f4f7f6; border-radius: 8px; padding: 12px; }
+.profitability-rates summary { cursor: pointer; color: #344b55; font-size: 13px; font-weight: 600; }
+.profitability-rates label { margin-top: 10px; }
 
 @media (max-width: 600px) {
   .effort-body .form-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }

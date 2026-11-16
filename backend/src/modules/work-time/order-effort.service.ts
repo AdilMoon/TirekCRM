@@ -6,9 +6,10 @@ import { csvText } from '../../common/csv';
 import { serializable } from '../../common/transaction';
 import { Database } from '../../database/database.service';
 import { AuditService } from '../audit/audit.service';
+import { orderTimeActiveEntries, orderTimeContributors, orderTimeTotalsSql, type OrderTimeTotals } from './order-time-totals';
 
 type Actor = AuthRequest['user'];
-type Totals = { actualMinutes: bigint; pendingMinutes: bigint; overtimeMinutes: bigint };
+type Totals = OrderTimeTotals;
 type Summary = Omit<OrderEffortRow, keyof Totals | 'deltaMinutes'> & Totals;
 const pageSize = 20;
 const maxExportRows = 10000;
@@ -24,12 +25,6 @@ const summary = (row: Summary): OrderEffortRow => ({
   plannedMinutes: row.plannedMinutes, orderVersion: row.orderVersion, ...totals(row),
   deltaMinutes: row.plannedMinutes !== null && row.actualMinutes > 0n ? Number(row.actualMinutes) - row.plannedMinutes : null,
 });
-const duration = Prisma.sql`(EXTRACT(EPOCH FROM (e."endsAt" - e."startsAt")) / 60)::int`;
-const effortTotals = Prisma.sql`
-  COALESCE(SUM(${duration}) FILTER (WHERE e.status = 'APPROVED'), 0) AS "actualMinutes",
-  COALESCE(SUM(${duration}) FILTER (WHERE e.status = 'SUBMITTED'), 0) AS "pendingMinutes",
-  COALESCE(SUM(${duration}) FILTER (WHERE e.status = 'APPROVED' AND e.kind = 'OVERTIME'), 0) AS "overtimeMinutes"`;
-const activeEntries = Prisma.sql`e.kind <> 'ABSENCE' AND e.status IN ('APPROVED', 'SUBMITTED')`;
 
 @Injectable()
 export class OrderEffortService {
@@ -39,13 +34,7 @@ export class OrderEffortService {
     return this.db.client.$transaction(async tx => {
       const order = await tx.order.findFirst({ where: { id, organizationId: actor.organizationId }, select: planSelect });
       if (!order) throw new NotFoundException('Заказ не найден');
-      const contributors = await tx.$queryRaw<Array<Totals & { employeeId: string; name: string }>>(Prisma.sql`
-        SELECT u.id AS "employeeId", u.name, ${effortTotals}
-        FROM "WorkTimeAllocation" a
-        JOIN "WorkTimeEntry" e ON e.id = a."entryId" AND e."organizationId" = a."organizationId"
-        JOIN "User" u ON u.id = e."employeeId" AND u."organizationId" = e."organizationId"
-        WHERE a."orderId" = ${id}::uuid AND a."organizationId" = ${actor.organizationId}::uuid AND ${activeEntries}
-        GROUP BY u.id, u.name ORDER BY "actualMinutes" DESC, u.name, u.id`);
+      const contributors = await orderTimeContributors(tx, actor.organizationId, id);
       const combined = contributors.reduce((acc, row) => ({
         actualMinutes: acc.actualMinutes + row.actualMinutes,
         pendingMinutes: acc.pendingMinutes + row.pendingMinutes,
@@ -90,10 +79,10 @@ export class OrderEffortService {
         SELECT o.*, x.*
         FROM matching o
         LEFT JOIN LATERAL (
-          SELECT ${effortTotals}
+          SELECT ${orderTimeTotalsSql}
           FROM "WorkTimeAllocation" a
           JOIN "WorkTimeEntry" e ON e.id = a."entryId" AND e."organizationId" = a."organizationId"
-          WHERE a."orderId" = o.id AND a."organizationId" = ${organizationId}::uuid AND ${activeEntries}
+          WHERE a."orderId" = o.id AND a."organizationId" = ${organizationId}::uuid AND ${orderTimeActiveEntries}
         ) x ON TRUE
       ), filtered AS (
         SELECT * FROM measured ${overrun ? Prisma.sql`WHERE "actualMinutes" > "plannedMinutes"` : Prisma.empty}

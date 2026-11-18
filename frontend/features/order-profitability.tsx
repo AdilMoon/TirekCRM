@@ -94,13 +94,30 @@ export function OrderProfitabilityPanel({ id, close }: { id: string; close: () =
         {record.actualRevenue !== record.revenue && <p className="muted">{t('Выручка по отменённому заказу: {0}', formatMoney(record.actualRevenue))}</p>}
       </div>
       <div className="effort-scroll"><table className="effort-table profitability-table">
-        <thead><tr><th>{t('Показатель')}</th><th>{t('План')}</th><th>{t('Факт')}</th></tr></thead>
+        <thead><tr><th>{t('Показатель')}</th><th>{t('План')}</th><th>{t('Факт')}</th><th>{t('Прогноз')}</th></tr></thead>
         <tbody>{measures.map(([key, label]) => <tr key={key}>
           <th scope="row">{t(label)}</th>
           <td className={record.planned[key]?.startsWith('-') ? 'effort-overrun' : undefined}>{formatted(record.planned, key)}</td>
           <td className={record.actual[key]?.startsWith('-') ? 'effort-overrun' : undefined}>{formatted(record.actual, key)}</td>
+          <td className={record.forecast.atCompletion[key]?.startsWith('-') ? 'effort-overrun' : undefined}>{formatted(record.forecast.atCompletion, key)}</td>
         </tr>)}</tbody>
       </table></div>
+      <section className="profitability-forecast">
+        <h3>{record.forecast.atCompletion.profit?.startsWith('-')
+          ? t('Ожидаемый убыток по заказу — {0}', formatMoney(record.forecast.atCompletion.profit.slice(1)))
+          : t('Прогноз к завершению заказа')}</h3>
+        {record.forecast.closed ? <p>{t('Заказ закрыт. Прогноз учитывает понесённые расходы и часы, включая часы на проверке.')}</p> : <>
+          <p>{record.forecast.remainingMinutes === null ? t('Для оценки оставшихся часов укажите длительность в разделе «План и факт по заказу».') :
+            t('Осталось по плану {0} после вычета подтверждённых часов и часов на проверке.', duration(record.forecast.remainingMinutes))}</p>
+          {record.forecast.remainingMinutes !== 0 && record.forecast.remainingHourlyRate !== null &&
+            <p>{t('Ставка для оставшихся часов — {0} в час.', formatMoney(record.forecast.remainingHourlyRate))}</p>}
+          <p>{record.forecast.remainingExpenses === null ? t('Введите бюджет прямых расходов. Если расходов не ожидается, укажите 0.') :
+            t('Остаток бюджета прямых расходов — {0}. Прогноз предполагает, что он будет израсходован.', formatMoney(record.forecast.remainingExpenses))}</p>
+        </>}
+        {record.forecast.atCompletion.labor === null && (record.pendingMinutes > 0 || record.forecast.remainingMinutes !== 0) && record.forecast.remainingHourlyRate === null &&
+          <p>{t('Для оценки часов на проверке и оставшейся работы укажите общую фактическую или плановую ставку.')}</p>}
+        {record.pendingMinutes > 0 && <p>{t('Часы на проверке включены только в прогноз. Для них применяется индивидуальная, общая фактическая или плановая ставка в этом порядке.')}</p>}
+      </section>
       <div className="profitability-notes">
         {record.actualMinutes === 0 ? <p className="muted">{t('Нет подтверждённых часов')}</p> :
           <p className="muted">{t('Учтено подтверждённых часов: {0}', duration(record.actualMinutes))}</p>}

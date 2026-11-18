@@ -38,6 +38,13 @@ export interface OrderProfitability {
   actualHourlyRate: string | null;
   planned: OrderCostColumn;
   actual: OrderCostColumn;
+  forecast: {
+    atCompletion: OrderCostColumn;
+    remainingMinutes: number | null;
+    remainingHourlyRate: string | null;
+    remainingExpenses: string | null;
+    closed: boolean;
+  };
   contributors: {
     employeeId: string;
     name: string;

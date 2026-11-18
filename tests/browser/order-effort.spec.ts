@@ -116,7 +116,9 @@ test('employee logs time and owner verifies the overrun report and order profita
   await dialog.getByLabel(/Айдана QA/).fill('160,10');
   await dialog.getByRole('button', { name: 'Сохранить бюджет и ставки' }).click();
   const margin = dialog.getByRole('row', { name: /Маржа/ });
-  await expect(margin.getByRole('cell')).toHaveText(['59,90%', '49,95%']);
+  await expect(margin.getByRole('cell')).toHaveText(['59,90%', '49,95%', '49,95%']);
+  await expect(dialog.getByRole('columnheader', { name: 'Прогноз', exact: true })).toBeVisible();
+  await expect(dialog.locator('.profitability-forecast')).toContainText('Осталось по плану 0 ч 0 мин');
   await expect(dialog.getByRole('row', { name: /Себестоимость/ })).toContainText('500,50');
   expect(await dialog.locator('.effort-scroll').evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('order-profitability-mobile.png') });

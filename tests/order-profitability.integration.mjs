@@ -102,6 +102,8 @@ test('profitability isolates rates and uses exact net costs and approved labor',
       assert.equal(initial.costVersion, main.costVersion);
       assert.deepEqual(initial.actual, { labor: null, expenses: '211.44', cost: null, profit: null, marginPercent: null });
       assert.equal(initial.planned.cost, null);
+      assert.equal(initial.forecast.atCompletion.profit, null);
+      assert.equal(initial.forecast.remainingExpenses, null);
       const publicFields = await request(owner, '/orders/' + main.id);
       assert.equal(Object.hasOwn(publicFields, 'actualHourlyRate'), false);
     });
@@ -124,9 +126,52 @@ test('profitability isolates rates and uses exact net costs and approved labor',
       assert.equal((await request(owner, '/orders/' + main.id)).version, main.version);
       assert.deepEqual(detail.planned, { labor: '240.30', expenses: '100.20', cost: '340.50', profit: '659.50', marginPercent: '65.95' });
       assert.deepEqual(detail.actual, { labor: '500.02', expenses: '150.25', cost: '650.27', profit: '349.73', marginPercent: '34.97' });
+      assert.deepEqual(detail.forecast.atCompletion, { labor: '700.03', expenses: '150.25', cost: '850.28', profit: '149.72', marginPercent: '14.97' });
+      assert.equal(detail.forecast.remainingMinutes, 0);
+      assert.equal(detail.forecast.remainingExpenses, '0.00');
       assert.deepEqual(detail.contributors.map(row => [row.employeeId, row.approvedMinutes, row.hourlyRate]), [[a.id, 90, null], [b.id, 30, '400.01']]);
       assert.equal((await request(owner, destPath)).actual.expenses, '12.01');
       assert.equal((await request(foreign, '/orders/' + outside.id + '/profitability')).actual.expenses, '5000.99');
+    });
+
+    await t.test('forecast prices only the remaining budget and stays stable as pending time is approved', async () => {
+      await db.order.update({ where: { id: main.id }, data: { plannedMinutes: 240 } });
+      const current = await request(owner, path);
+      const version = await budget({ ...basis, costVersion: current.costVersion, plannedDirectExpenses: '300' });
+      const before = await request(owner, path);
+      assert.equal(before.forecast.remainingMinutes, 60);
+      assert.equal(before.forecast.remainingExpenses, '149.75');
+      assert.deepEqual(before.forecast.atCompletion, { labor: '900.04', expenses: '300.00', cost: '1200.04', profit: '-200.04', marginPercent: '-20.00' });
+      await db.order.update({ where: { id: main.id }, data: { status: 'COMPLETED' } });
+      const finished = await request(owner, path);
+      assert.equal(finished.forecast.remainingMinutes, 0);
+      assert.equal(finished.forecast.remainingExpenses, '0.00');
+      assert.equal(finished.forecast.atCompletion.labor, '700.03');
+      assert.equal(finished.actual.labor, '500.02');
+      await db.order.update({ where: { id: main.id }, data: { status: main.status } });
+      const entry = await db.workTimeEntry.findFirstOrThrow({ where: { organizationId: org, employeeId: pendingOnly.id, status: 'SUBMITTED' } });
+      await request(owner, '/work-time/' + entry.id + '/decision', 200, 'PATCH', { status: 'APPROVED', version: entry.version });
+      const after = await request(owner, path);
+      assert.deepEqual(after.forecast, before.forecast);
+      assert.equal(after.actual.labor, '700.03');
+      await request(owner, '/work-time/' + entry.id + '/decision', 200, 'PATCH', { status: 'VOIDED', version: entry.version + 1, note: 'Fixture' });
+      await db.order.update({ where: { id: main.id }, data: { plannedMinutes: 120 } });
+      await budget({ ...basis, costVersion: version.costVersion });
+    });
+
+    await t.test('completed work has no future budget and open orders distinguish missing inputs from zero', async () => {
+      const save = input => request(owner, destPath, 200, 'PATCH', input);
+      const dest = await request(owner, destPath);
+      const priced = await save({ ...basis, costVersion: dest.costVersion, plannedHourlyRate: '90', actualHourlyRate: null, rates: [] });
+      assert.equal((await request(owner, destPath)).forecast.atCompletion.labor, '180.00');
+      await db.order.update({ where: { id: destination.id }, data: { plannedMinutes: null } });
+      assert.equal((await request(owner, destPath)).forecast.atCompletion.labor, null);
+      await save({ ...basis, costVersion: priced.costVersion, actualHourlyRate: '0', rates: [] });
+      assert.equal((await request(owner, destPath)).forecast.atCompletion.labor, '0.00');
+      await db.order.update({ where: { id: destination.id }, data: { status: 'COMPLETED' } });
+      const closed = await request(owner, destPath);
+      assert.equal(closed.forecast.closed, true);
+      assert.deepEqual(closed.forecast.atCompletion, closed.actual);
     });
 
     await t.test('clearing an override falls back to the shared rate; zero and a loss remain distinct', async () => {
@@ -147,6 +192,7 @@ test('profitability isolates rates and uses exact net costs and approved labor',
       assert.equal(cancelled.planned.profit, '659.50');
       assert.equal(cancelled.actualRevenue, '0.00');
       assert.deepEqual(cancelled.actual, { labor: '0.00', expenses: '150.25', cost: '150.25', profit: '-150.25', marginPercent: null });
+      assert.deepEqual(cancelled.forecast.atCompletion, cancelled.actual);
     });
   } finally {
     await db.expenseReversal.deleteMany({ where: scope });

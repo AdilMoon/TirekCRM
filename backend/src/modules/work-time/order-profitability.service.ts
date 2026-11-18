@@ -83,12 +83,37 @@ export class OrderProfitabilityService {
         ? null : roundedDivide(plannedRate * BigInt(order.plannedMinutes), 60n);
       const revenue = cents(order.total.toFixed(2));
       const actualRevenue = order.status === 'CANCELLED' ? 0n : revenue;
+      const closed = order.status === 'COMPLETED' || order.status === 'CANCELLED';
+      const remainingRate = budget.actualHourlyRate ?? budget.plannedHourlyRate;
+      const remainingMinutes = closed ? 0 : order.plannedMinutes === null ? null :
+        Math.max(0, order.plannedMinutes - Number(actualMinutes + pendingMinutes));
+      const incurredExpenses = BigInt(expense.cents);
+      const expenseBudget = budget.plannedDirectExpenses === null ? null : cents(budget.plannedDirectExpenses);
+      const remainingExpenses = closed ? 0n : expenseBudget === null ? null :
+        expenseBudget > incurredExpenses ? expenseBudget - incurredExpenses : 0n;
+
+      // Accumulate minute × rate for all stages before rounding once to the nearest tiyn.
+      let forecastLabor = actualLabor;
+      for (const row of time) {
+        if (row.pendingMinutes === 0n || forecastLabor === null) continue;
+        const rate = byEmployee.get(row.employeeId) ?? remainingRate;
+        forecastLabor = rate === null ? null : forecastLabor + row.pendingMinutes * cents(rate);
+      }
+      if (forecastLabor !== null && remainingMinutes !== 0 && remainingRate !== '0.00') {
+        forecastLabor = remainingMinutes === null || remainingRate === null ? null :
+          forecastLabor + BigInt(remainingMinutes) * cents(remainingRate);
+      }
       return {
         id, number: order.number, title: order.title, costVersion: order.costVersion, revenue: money(revenue),
         actualRevenue: money(actualRevenue),
         plannedMinutes: order.plannedMinutes, actualMinutes: Number(actualMinutes), pendingMinutes: Number(pendingMinutes), ...budget,
-        planned: costColumn(revenue, plannedLabor, budget.plannedDirectExpenses === null ? null : cents(budget.plannedDirectExpenses)),
-        actual: costColumn(actualRevenue, actualLabor === null ? null : roundedDivide(actualLabor, 60n), BigInt(expense.cents)),
+        planned: costColumn(revenue, plannedLabor, expenseBudget),
+        actual: costColumn(actualRevenue, actualLabor === null ? null : roundedDivide(actualLabor, 60n), incurredExpenses),
+        forecast: {
+          atCompletion: costColumn(actualRevenue, forecastLabor === null ? null : roundedDivide(forecastLabor, 60n),
+            remainingExpenses === null ? null : incurredExpenses + remainingExpenses),
+          remainingMinutes, remainingHourlyRate: remainingRate, remainingExpenses: asMoney(remainingExpenses), closed,
+        },
         contributors: contributors.map(({ minutes, ...row }) => ({ ...row, approvedMinutes: Number(minutes) })),
       };
     }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });

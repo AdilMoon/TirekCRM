@@ -9,6 +9,25 @@ import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { FinanceService } from '../backend/dist/modules/finance/finance.service.js';
 import { AuditService } from '../backend/dist/modules/audit/audit.service.js';
+import { serializable } from '../backend/dist/common/transaction.js';
+
+test('a PostgreSQL commit conflict retries the transaction and remains bounded', async () => {
+  const conflict = Object.assign(new Error('TransactionWriteConflict'), {
+    name: 'DriverAdapterError', cause: { kind: 'TransactionWriteConflict' },
+  });
+  let attempts = 0;
+  const db = { $transaction: async operation => {
+    const result = await operation();
+    if (++attempts === 1) throw conflict;
+    return result;
+  }};
+  assert.equal(await serializable(db, async () => 'saved'), 'saved');
+  assert.equal(attempts, 2);
+  attempts = 0;
+  await assert.rejects(serializable({ $transaction: async () => { attempts++; throw conflict; } }, async () => {}),
+    error => error.getStatus() === 409);
+  assert.equal(attempts, 4);
+});
 
 const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL, max: 6 }) });
 const orgs = [], origin = process.env.WEB_ORIGIN ?? 'http://localhost:3000';

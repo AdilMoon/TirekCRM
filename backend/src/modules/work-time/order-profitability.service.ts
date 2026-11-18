@@ -87,7 +87,8 @@ export class OrderProfitabilityService {
       const remainingRate = budget.actualHourlyRate ?? budget.plannedHourlyRate;
       const remainingMinutes = closed ? 0 : order.plannedMinutes === null ? null :
         Math.max(0, order.plannedMinutes - Number(actualMinutes + pendingMinutes));
-      const incurredExpenses = BigInt(expense.cents);
+      const material = await tx.materialMovement.aggregate({where:{organizationId,orderId:id},_sum:{costCents:true}});
+      const incurredExpenses = BigInt(expense.cents) + (material._sum.costCents ?? 0n);
       const expenseBudget = budget.plannedDirectExpenses === null ? null : cents(budget.plannedDirectExpenses);
       const remainingExpenses = closed ? 0n : expenseBudget === null ? null :
         expenseBudget > incurredExpenses ? expenseBudget - incurredExpenses : 0n;

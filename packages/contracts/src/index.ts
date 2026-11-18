@@ -56,8 +56,11 @@ export const updateOrganizationSchema=organizationSchema.extend({version:z.numbe
 export type OrderInput = z.infer<typeof orderSchema>;
 export type PaymentInput = z.infer<typeof paymentSchema>;
 export type ExpenseInput = z.infer<typeof expenseSchema>;
+const materialQuantity = z.number().int().min(1).max(1_000_000);
+const stockPurchase = z.strictObject({ name: text(160), quantity: materialQuantity });
 export const receiptDecisionSchema = z.discriminatedUnion('status', [
-  z.strictObject({ status: z.literal('APPROVED'), category: expenseSchema.shape.category }),
+  z.strictObject({ status: z.literal('APPROVED'), category: expenseSchema.shape.category, stock: stockPurchase.optional() })
+    .refine(value => !value.stock || value.category === 'MATERIALS'),
   z.strictObject({ status: z.literal('REJECTED') }),
 ]);
 export const receiptListSchema = z.strictObject({
@@ -66,6 +69,7 @@ export const receiptListSchema = z.strictObject({
   page: z.string().regex(/^[1-9]\d{0,5}$/).transform(Number).default(1),
 });
 export interface ReceiptItem {
+  stock: { name: string; quantity: number } | null;
   id: string;
   amount: string;
   description: string;
@@ -74,6 +78,17 @@ export interface ReceiptItem {
   createdAt: string;
   reviewerName: string | null;
   reviewedAt: string | null;
+}
+export const materialListSchema = z.strictObject({
+  orderId: z.uuid().optional(), search: z.string().trim().max(160).default(''),
+  page: z.string().regex(/^[1-9]\d{0,5}$/).transform(Number).default(1),
+});
+export const materialMoveSchema = z.strictObject({
+  orderId: z.uuid(), kind: z.enum(['ISSUE', 'RETURN']), quantity: materialQuantity, idempotencyKey: z.uuid(),
+});
+export interface MaterialLotItem {
+  id: string; name: string; quantity: number; available: number; availableValue: string;
+  amount: string; receiptId: string; createdAt: string; allocated: number; allocatedValue: string;
 }
 export const expenseLabels: Record<string, string> = { MATERIALS: 'Материалы', LABOR: 'Исполнители', TRANSPORT: 'Транспорт', RENT: 'Аренда', OTHER: 'Прочее' };
 

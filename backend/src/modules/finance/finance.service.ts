@@ -60,6 +60,8 @@ export class FinanceService {
     return correction(existing);
    }
    if(row.reversal)throw new ConflictException('Расход уже сторнирован');
+   const lot=await tx.materialLot.findFirst({where:{expenseId:id,organizationId},select:{available:true,quantity:true}});
+   if(lot && lot.available!==lot.quantity)throw new ConflictException('Сначала верните выданные материалы из заказов');
    const reversed=await tx.expenseReversal.create({data:{organizationId,expenseId:id,amount:row.amount,reason:input.reason,idempotencyKey:input.idempotencyKey,actorId:owner.id,actorName:owner.name}});
    await this.audit.record(tx,owner,'EXPENSE',id,'EXPENSE_REVERSED',{reversalId:reversed.id,amount:row.amount.toFixed(2),category:row.category});
    return correction(reversed);
@@ -80,6 +82,7 @@ export class FinanceService {
     return replacementResult(existing);
    }
    if(row.reversal)throw new ConflictException('Расход уже сторнирован');
+   if(await tx.materialLot.findFirst({where:{expenseId:id,organizationId},select:{expenseId:true}}))throw new ConflictException('Для отмены закупки используйте сторно');
    if(row.amount.toFixed(2)===amount&&row.description===input.description&&row.category===input.category&&row.orderId===input.orderId)throw new ConflictException('Новый расход должен отличаться от исходного');
    if(input.orderId&&!await tx.order.findFirst({where:{id:input.orderId,organizationId}}))throw new NotFoundException('Заказ не найден');
    const createdAt=new Date();

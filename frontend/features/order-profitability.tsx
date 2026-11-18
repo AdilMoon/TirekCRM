@@ -6,6 +6,7 @@ import { Field, ModalShell } from '../components/ui';
 import { useI18n } from '../i18n/provider';
 import { api } from '../lib/api';
 import { ExpenseReceipts } from './expense-receipts';
+import { MaterialLots } from './material-lots';
 
 const measures = [
   ['labor', 'Стоимость труда'],
@@ -128,6 +129,7 @@ export function OrderProfitabilityPanel({ id, close }: { id: string; close: () =
       </div>
 
       <ExpenseReceipts orderId={id} onChange={refresh}/>
+      <MaterialLots orderId={id} revision={load} onChange={refresh}/>
       <form className="editor-form" onSubmit={submit} key={record.costVersion}>
         <h3>{t('Бюджет и ставки этого заказа')}</h3>
         <div className="form-row">

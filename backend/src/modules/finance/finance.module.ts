@@ -6,6 +6,8 @@ import {FinanceController} from './finance.controller';
 import {FinanceService} from './finance.service';
 import { ExpenseReceiptsController } from './expense-receipts.controller';
 import { ExpenseReceiptsService } from './expense-receipts.service';
-@Module({imports:[DatabaseModule,AuthModule,AuditModule],controllers:[FinanceController,ExpenseReceiptsController],
- providers:[FinanceService,ExpenseReceiptsService],exports:[ExpenseReceiptsService]})
+import { MaterialsController } from './materials.controller';
+import { MaterialsService } from './materials.service';
+@Module({imports:[DatabaseModule,AuthModule,AuditModule],controllers:[FinanceController,ExpenseReceiptsController,MaterialsController],
+ providers:[FinanceService,ExpenseReceiptsService,MaterialsService],exports:[ExpenseReceiptsService]})
 export class FinanceModule {}

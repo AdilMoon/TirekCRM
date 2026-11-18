@@ -1,6 +1,6 @@
 'use client';
 import { useI18n } from '../i18n/provider';
-import { useRef, useState, type FormEvent } from 'react';
+import { useRef, useState, type Dispatch, type FormEvent, type SetStateAction } from 'react';
 import { Check, Clock3, CreditCard, ChartNoAxesCombined, FileText, Plus, X, LoaderCircle } from 'lucide-react';
 import { expenseLabels, type Order } from '@tirek/contracts';
 import { api } from '../lib/api';
@@ -16,7 +16,7 @@ import {OrderAssignment} from './order-assignment';
 import {OrderQuoteManager} from './order-quote-manager';
 import { OrderEffort } from './order-effort';
 import { OrderProfitabilityPanel } from './order-profitability';
-export function Editor({ modal, close, saved, setModal }: { modal: Modal; close: () => void; saved: (message: string) => Promise<void>; setModal: (m: Modal) => void }) {
+export function Editor({ modal, close, saved, setModal }: { modal: Modal; close: () => void; saved: (message: string) => Promise<void>; setModal: Dispatch<SetStateAction<Modal | null>> }) {
   const { t, formatMoney, dateLabel } = useI18n();
 
   const [busy, setBusy] = useState(false); const [error, setError] = useState('');
@@ -29,11 +29,18 @@ export function Editor({ modal, close, saved, setModal }: { modal: Modal; close:
   if (!idempotency.current) idempotency.current = crypto.randomUUID();
   const [lines, setLines] = useState(modal.kind === 'edit-order' && modal.order ? modal.order.items.map(({description,quantity,unitPrice})=>({description,quantity,unitPrice})) : [{ description: '', quantity: 1, unitPrice: '' }]);
   const titles = { invoice:t("Создать счёт на оплату"), 'edit-order':t('Редактировать заказ'), client: modal.client ? t("Редактировать клиента") : t("Новый клиент"), order: t("Новый заказ"), expense: t("Добавить расход"), payment: t("Записать оплату"), document: t("Создать черновик акта"), details: t("Карточка заказа"), about: t("О проекте Tirek") };
-  if(profitability&&modal.order)return <OrderProfitabilityPanel id={modal.order.id} close={()=>{setProfitability(false);api<Order>('/orders/'+modal.order!.id).then(order=>setModal({kind:'details',order})).catch(e=>setError(e.message));}}/>;
-  if(effort&&modal.order)return <OrderEffort id={modal.order.id} close={()=>{setEffort(false);api<Order>('/orders/'+modal.order!.id).then(order=>setModal({kind:'details',order})).catch(e=>setError(e.message));}}/>;
-  if(quote&&modal.order)return <OrderQuoteManager id={modal.order.id} close={()=>{setQuote(false);api<Order>('/orders/'+modal.order!.id).then(order=>setModal({kind:'details',order})).catch(e=>setError(e.message));}}/>;
-  if(assignment&&modal.order)return <OrderAssignment id={modal.order.id} close={()=>{setAssignment(false);api<Order>('/orders/'+modal.order!.id).then(order=>setModal({kind:'details',order})).catch(e=>setError(e.message));}}/>;
-  if(passport&&modal.order)return <OrderPassportManager id={modal.order.id} close={()=>{setPassport(false);api<Order>('/orders/'+modal.order!.id).then(order=>setModal({kind:'details',order})).catch(e=>setError(e.message));}}/>;
+  function returnToDetails(hide: (value: boolean) => void) {
+    hide(false);
+    if (modal.kind !== 'details') return;
+    api<Order>('/orders/'+modal.order.id)
+      .then(order => setModal(current => current === modal ? {kind:'details',order} : current))
+      .catch(e => setError(e.message));
+  }
+  if(profitability && modal.order) return <OrderProfitabilityPanel id={modal.order.id} close={()=>returnToDetails(setProfitability)}/>;
+  if(effort && modal.order) return <OrderEffort id={modal.order.id} close={()=>returnToDetails(setEffort)}/>;
+  if(quote && modal.order) return <OrderQuoteManager id={modal.order.id} close={()=>returnToDetails(setQuote)}/>;
+  if(assignment && modal.order) return <OrderAssignment id={modal.order.id} close={()=>returnToDetails(setAssignment)}/>;
+  if(passport && modal.order) return <OrderPassportManager id={modal.order.id} close={()=>returnToDetails(setPassport)}/>;
   async function action(fn: () => Promise<unknown>, message: string) { setBusy(true); setError(''); try { await fn(); await saved(message); } catch (e) { setError((e as Error).message); } finally { setBusy(false); } }
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault(); const form = new FormData(e.currentTarget); const text = (key: string) => String(form.get(key) ?? '').trim();

@@ -1,6 +1,7 @@
 'use client';
 import {FinancialOperationDialog} from './financial-operation';
 import { ExpenseReceipts } from './expense-receipts';
+import { MaterialLots } from './material-lots';
 import { useState } from 'react';
 import { ArrowDownLeft,ArrowUpRight,Download,FileText,Wallet } from 'lucide-react';
 import { expenseLabels,type Movement,type MovementPage,type DocumentRecord } from '@tirek/contracts';
@@ -50,6 +51,7 @@ export function FinanceReport({revision,onOrder,onChanged}:{revision:unknown;onO
  <div className="report-filter-row"><Period filters={filters} reset={()=>{filters.reset();setKind('');setCategory('');}}/><label className="filter-label">{t('Категория')}<select value={category} onChange={e=>{setCategory(e.target.value);filters.setPage(1);}}><option value="">{t('Все категории')}</option>{Object.entries(categories).map(([key,label])=><option key={key} value={key}>{t(label)}</option>)}</select></label></div>
  </section>
  <ExpenseReceipts onChange={()=>{retry();onChanged();}}/>
+ <MaterialLots revision={revision}/>
  <div className="report-export-bar">
   <p className="report-scope">{t('Итоги по всем операциям с выбранными фильтрами')}</p>
   <button type="button" className="button secondary" disabled={filters.invalid||exporting} onClick={exportReport}>

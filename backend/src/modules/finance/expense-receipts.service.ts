@@ -7,6 +7,7 @@ import { Database } from '../../database/database.service';
 import { serializable } from '../../common/transaction';
 import { AuditService, type Actor } from '../audit/audit.service';
 import { recordExpense } from './expense-writer';
+import { cents } from '../../common/money';
 
 @Injectable()
 export class ExpenseReceiptsService {
@@ -45,11 +46,11 @@ export class ExpenseReceiptsService {
     const [items, total] = await this.db.client.$transaction([
       this.db.client.expenseReceipt.findMany({ where, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         take: pageSize, skip: (query.page - 1) * pageSize,
-        select: { id: true, amount: true, description: true, employee: { select: { name: true } },
+        select: { id: true, amount: true, description: true, expense: { select: { materialLot: { select: { name: true, quantity: true } } } }, employee: { select: { name: true } },
           order: { select: { id: true, number: true, title: true } }, createdAt: true, reviewedAt: true, reviewerName: true } }),
       this.db.client.expenseReceipt.count({ where }),
     ], { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
-    return { items: items.map(row => ({ ...row, amount: row.amount.toFixed(2) })),
+    return { items: items.map(({expense, ...row}) => ({ ...row, stock: expense?.materialLot ?? null, amount: row.amount.toFixed(2) })),
       total, pageSize, page: query.page, pages: Math.ceil(total / pageSize) };
   }
 
@@ -65,18 +66,24 @@ export class ExpenseReceiptsService {
       const owner = await tx.user.findFirst({ where: { id: actor.id, organizationId, isActive: true, role: 'OWNER' }, select: { name: true } });
       if (!owner) throw new ForbiddenException('Недостаточно прав');
       const row = await tx.expenseReceipt.findFirst({ where: { id, organizationId },
-        select: { orderId: true, amount: true, description: true, status: true, expense: { select: { id: true, category: true } } } });
+        select: { orderId: true, amount: true, description: true, status: true, expense: { select: { id: true, category: true, materialLot: { select: { name: true, quantity: true } } } } } });
       if (!row) throw new NotFoundException('Чек не найден');
       if (row.status !== 'PENDING') {
-        if (row.status !== decision.status || (decision.status === 'APPROVED' && row.expense?.category !== decision.category))
+        const stock = decision.status === 'APPROVED' ? decision.stock : undefined;
+        if (row.status !== decision.status || (decision.status === 'APPROVED' && row.expense?.category !== decision.category) ||
+          row.expense?.materialLot?.name !== stock?.name || row.expense?.materialLot?.quantity !== stock?.quantity)
           throw new ConflictException('По чеку уже принято другое решение');
         return { status: row.status, expenseId: row.expense?.id ?? null };
       }
       const expense = decision.status === 'APPROVED' ? await recordExpense(tx, this.audit, actor, {
-        orderId: row.orderId, amount: row.amount.toFixed(2), description: row.description,
+        orderId: decision.stock ? undefined : row.orderId, amount: row.amount.toFixed(2), description: row.description,
         category: decision.category, idempotencyKey: randomUUID(),
       }) : null;
       const expenseId = expense?.id ?? null;
+      if (expense && decision.status === 'APPROVED' && decision.stock) {
+        const {name, quantity} = decision.stock;
+        await tx.materialLot.create({data:{organizationId, expenseId:expense.id, name, quantity, available:quantity, availableCents:cents(row.amount.toFixed(2))}});
+      }
       await tx.expenseReceipt.update({ where: { id }, data: { status: decision.status, expenseId, reviewedAt: new Date(), reviewerName: owner.name } });
       await this.audit.record(tx, actor, 'ORDER', row.orderId, decision.status === 'APPROVED' ? 'RECEIPT_APPROVED' : 'RECEIPT_REJECTED', { receiptId: id, expenseId });
       return { status: decision.status, expenseId };

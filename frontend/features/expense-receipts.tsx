@@ -14,6 +14,9 @@ export function ExpenseReceipts({ orderId, onChange }: { orderId?: string; onCha
   const [page, setPage] = useState(1);
   const [opened, setOpened] = useState('');
   const [category, setCategory] = useState('MATERIALS');
+  const [stock, setStock] = useState(false);
+  const [name, setName] = useState('');
+  const [quantity, setQuantity] = useState('1');
   const [working, setWorking] = useState(false);
   const [notice, setNotice] = useState('');
   const [problem, setProblem] = useState('');
@@ -21,7 +24,8 @@ export function ExpenseReceipts({ orderId, onChange }: { orderId?: string; onCha
   const params = new URLSearchParams({ status, page: String(page), ...(orderId ? { orderId } : {}) });
   const { result, error, busy, retry } = usePage<ReceiptItem>('/finance/receipts', params.toString());
 
-  function open(id: string) {
+  function open(id: string, description = '') {
+    setStock(false); setName(description.slice(0,160)); setQuantity('1');
     setOpened(id); setPhotoReady(false); setCategory('MATERIALS'); setProblem(''); setNotice('');
   }
   async function decide(id: string, approve: boolean) {
@@ -29,9 +33,9 @@ export function ExpenseReceipts({ orderId, onChange }: { orderId?: string; onCha
     setWorking(true); setProblem(''); setNotice('');
     try {
       await api('/finance/receipts/' + id, { method: 'PATCH', body: JSON.stringify(approve
-        ? { status: 'APPROVED', category } : { status: 'REJECTED' }) });
+        ? { status: 'APPROVED', category: stock ? 'MATERIALS' : category, ...(stock ? {stock:{name:name.trim(),quantity:Number(quantity)}} : {}) } : { status: 'REJECTED' }) });
       open('');
-      setNotice(approve ? 'Расход по чеку учтён в заказе' : 'Чек отклонён');
+      setNotice(approve ? (stock ? 'Партия принята на склад' : 'Расход по чеку учтён в заказе') : 'Чек отклонён');
       if (result?.items.length === 1 && page > 1) setPage(page - 1);
       retry();
       if (approve) onChange();
@@ -52,18 +56,26 @@ export function ExpenseReceipts({ orderId, onChange }: { orderId?: string; onCha
     {result?.items.map(row => <article key={row.id} className="receipt-item">
       <div className="receipt-heading"><strong>{formatMoney(row.amount)}</strong>
         <button type="button" className="text-button" aria-expanded={opened === row.id} disabled={working}
-          onClick={() => open(opened === row.id ? '' : row.id)}>{t(opened === row.id ? 'Скрыть чек' : 'Посмотреть чек')}</button></div>
+          onClick={() => open(opened === row.id ? '' : row.id, row.description)}>{t(opened === row.id ? 'Скрыть чек' : 'Посмотреть чек')}</button></div>
       <p>{row.description}</p>
+      {row.stock && <p>{t('Закупка на склад')} · {row.stock.name} × {row.stock.quantity}</p>}
       <p className="muted">{t('Заказ № {0}', row.order.number)} · {row.order.title} · {row.employee.name} · {formatDate(row.createdAt)}</p>
       {row.reviewedAt && <p className="muted">{row.reviewerName} · {formatDate(row.reviewedAt)}</p>}
       {opened === row.id && <>
         <a href={'/api/finance/receipts/' + row.id + '/photo'} target="_blank" rel="noreferrer">
           <img src={'/api/finance/receipts/' + row.id + '/photo'} alt={t('Фото чека')} onLoad={() => setPhotoReady(true)}
             onError={() => { setPhotoReady(false); setProblem('Не удалось загрузить фото чека'); }}/></a>
-        {status === 'PENDING' && <div className="receipt-actions"><label>{t('Категория')} <select value={category} disabled={working}
+        {status === 'PENDING' && <div className="receipt-actions">
+          <label>{t('Назначение чека')} <select value={stock?'stock':'direct'} disabled={working} onChange={e=>setStock(e.target.value==='stock')}>
+            <option value="direct">{t('Расход этого заказа')}</option><option value="stock">{t('Закупка на склад')}</option></select></label>
+          {stock ? <>
+            <label>{t('Материал')} <input maxLength={160} value={name} disabled={working} onChange={e=>setName(e.target.value)}/></label>
+            <label>{t('Количество в партии')} <input type="number" min="1" max="1000000" step="1" value={quantity} disabled={working} onChange={e=>setQuantity(e.target.value)}/></label>
+            <p className="muted">{t('Вся сумма чека относится к одной партии. Затраты попадут в заказ при выдаче материала.')}</p>
+          </> : <label>{t('Категория')} <select value={category} disabled={working}
           onChange={e => setCategory(e.target.value)}>{Object.entries(expenseLabels).map(([key, label]) =>
-            <option key={key} value={key}>{t(label)}</option>)}</select></label>
-          <button className="button primary" type="button" disabled={working || !photoReady} onClick={() => decide(row.id, true)}>{t('Подтвердить расход')}</button>
+            <option key={key} value={key}>{t(label)}</option>)}</select></label>}
+          <button className="button primary" type="button" disabled={working || !photoReady || (stock && (!name.trim() || !Number.isInteger(Number(quantity)) || Number(quantity)<1 || Number(quantity)>1000000))} onClick={() => decide(row.id, true)}>{t(stock?'Принять на склад':'Подтвердить расход')}</button>
           <button className="button secondary" type="button" disabled={working} onClick={() => decide(row.id, false)}>{t('Отклонить чек')}</button>
         </div>}
       </>}

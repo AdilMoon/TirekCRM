@@ -1,5 +1,7 @@
 import type { NextConfig } from 'next';
 const nextConfig: NextConfig = {
+  // Keep local Docker builds within the desktop VM's memory budget.
+  ...(process.env.TIREK_DOCKER_BUILD === '1' ? { experimental: { cpus: 2 } } : {}),
   poweredByHeader: false,
   async headers() {
     return [{

@@ -17,7 +17,7 @@ COPY frontend ./frontend
 COPY packages/contracts ./packages/contracts
 COPY scripts/web.mjs ./scripts/
 ENV API_INTERNAL_URL=http://api:4000
-RUN npm run db:generate && npm run build
+RUN npm run db:generate && TIREK_DOCKER_BUILD=1 npm run build
 
 FROM base AS runtime
 ENV NODE_ENV=production API_INTERNAL_URL=http://api:4000

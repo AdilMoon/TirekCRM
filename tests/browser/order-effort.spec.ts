@@ -3,6 +3,11 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
+import sharp from 'sharp';
+import { AuditService } from '../../backend/dist/modules/audit/audit.service.js';
+import { ExpenseReceiptsService } from '../../backend/dist/modules/finance/expense-receipts.service.js';
+import { TelegramProcessor } from '../../backend/dist/modules/telegram/telegram-processor.js';
+import { TelegramService } from '../../backend/dist/modules/telegram/telegram.service.js';
 import { expect, test } from './fixtures';
 
 const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }) });
@@ -30,6 +35,19 @@ test.beforeAll(async () => {
     organizationId, clientId: client.id, number: 1, title: 'Монтаж витрины QA', total: '1000.00',
   } });
   orderId = order.id;
+  const task = await db.businessTask.create({ data: { organizationId, orderId, assigneeId: employee.id,
+    createdById: supervisor.id, title: 'Receipt purchase QA' } });
+  const botId = String(Date.now()), senderId = 101;
+  await db.telegramLink.create({ data: { organizationId, userId: employee.id, botId, telegramUserId: String(senderId), username: '', displayName: 'Worker QA' } });
+  const transport = { config: { botId }, call: async () => true, send: async () => ({ message_id: 3 }),
+    photo: () => sharp({ create: { width: 100, height: 160, channels: 3, background: '#eee' } }).jpeg().toBuffer() };
+  const database = { client: db }, audit = new AuditService(database);
+  const processor = new TelegramProcessor(database, new TelegramService(database, transport, audit), transport,
+    null, null, new ExpenseReceiptsService(database, audit));
+  const message = { chat: { type: 'private', id: senderId }, from: { id: senderId }, date: Math.floor(Date.now() / 1000) };
+  await processor.handle({ update_id: 1, callback_query: { id: 'pick', from: message.from, message: { ...message, message_id: 1 }, data: 'receipt:' + task.id } });
+  await processor.handle({ update_id: 2, message: { ...message, date: Math.floor(Date.now() / 1000), message_id: 2, caption: '125,50\nКрепёж QA', photo: [{ file_id: 'fixture', width: 100, height: 160 }] } });
+  await db.businessTask.delete({ where: { id: task.id } });
   await db.expense.create({ data: {
     organizationId, orderId, amount: '100.25', description: 'Материалы QA', category: 'MATERIALS', idempotencyKey: randomUUID(),
   } });
@@ -41,6 +59,7 @@ test.beforeAll(async () => {
 test.afterAll(async () => {
   await db.workTimeEntry.deleteMany({ where: { organizationId } });
   await db.businessTask.deleteMany({ where: { organizationId } });
+  await db.expenseReceipt.deleteMany({ where: { organizationId } });
   await db.expense.deleteMany({ where: { organizationId } });
   await db.order.deleteMany({ where: { organizationId } });
   await db.client.deleteMany({ where: { organizationId } });
@@ -69,6 +88,8 @@ test('employee logs time and owner verifies the overrun report and order profita
   await expect(page.getByRole('status').filter({ hasText: 'Время отправлено на проверку' })).toBeVisible();
 
   await signIn(owner);
+  await page.getByRole('button', { name: /^Финансы/ }).click();
+  await expect(page.getByRole('region', { name: 'Чеки сотрудников' })).toContainText('Крепёж QA');
   await page.getByRole('button', { name: /^Заказы/ }).click();
   await page.getByRole('button', { name: /^Монтаж витрины QA/ }).click();
   await dialog.getByRole('button', { name: 'План и факт по заказу', exact: true }).click();
@@ -121,5 +142,15 @@ test('employee logs time and owner verifies the overrun report and order profita
   await expect(dialog.locator('.profitability-forecast')).toContainText('Осталось по плану 0 ч 0 мин');
   await expect(dialog.getByRole('row', { name: /Себестоимость/ })).toContainText('500,50');
   expect(await dialog.locator('.effort-scroll').evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+  const receipts = dialog.getByRole('region', { name: 'Чеки сотрудников' });
+  await expect(receipts).toContainText('Крепёж QA');
+  await receipts.getByRole('button', { name: 'Посмотреть чек' }).click();
+  await expect(receipts.getByRole('img', { name: 'Фото чека' })).toBeVisible();
+  await receipts.getByRole('button', { name: 'Подтвердить расход' }).click();
+  await expect(receipts).toContainText('Расход по чеку учтён в заказе');
+  await expect(dialog.getByRole('row', { name: /Прямые расходы/ }).getByRole('cell').nth(1)).toContainText('225,75');
+  await expect(margin.getByRole('cell')).toHaveText(['59,90%', '37,40%', '37,40%']);
+  await receipts.getByLabel('Статус чека').selectOption('APPROVED');
+  await expect(receipts).toContainText('Крепёж QA');
   await page.screenshot({ path: testInfo.outputPath('order-profitability-mobile.png') });
 });

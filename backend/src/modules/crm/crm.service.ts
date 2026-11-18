@@ -1,5 +1,6 @@
 import {movementSource,receivedSql,expensesSql,cashFlowSql} from '../finance/ledger';
 import {paidCents,paymentsWithRefunds} from '../../common/paid';
+import { recordExpense } from '../finance/expense-writer';
 import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { ClientInput, UpdateClientInput, OrganizationRecord, OrderInput, PaymentInput, ExpenseInput, Stage, stages, DocumentSnapshot, UpdateOrderInput } from '@tirek/contracts';
@@ -171,8 +172,7 @@ export class CrmService {
         return { ...existing, amount: amount(existing.amount) };
       }
       if (input.orderId && !await tx.order.findFirst({ where: { id: input.orderId, organizationId: org } })) throw new NotFoundException('Заказ не найден');
-      const expense = await tx.expense.create({ data: { ...input, organizationId: org } });
-      await this.audit.record(tx,actor,'EXPENSE',expense.id,'EXPENSE_RECORDED',{amount:amount(expense.amount),category:expense.category});
+      const expense = await recordExpense(tx, this.audit, actor, input);
       return { ...expense, amount: amount(expense.amount) };
     });
   }

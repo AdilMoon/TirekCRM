@@ -33,7 +33,7 @@ export class PassportService {
   const user=await tx.user.findFirst({where:{id:actor.id,organizationId:actor.organizationId,isActive:true}});
   if(!user)throw new ForbiddenException('Недостаточно прав');
   if(telegram){
-   if(user.role!=='EMPLOYEE'||!await tx.telegramLink.findFirst({where:{id:telegram.linkId,userId:actor.id,organizationId:actor.organizationId,selectedTaskId:telegram.taskId,selectedAt:{gt:new Date(Date.now()-900000)}}})||!await tx.businessTask.findFirst({where:{id:telegram.taskId,orderId:id,organizationId:actor.organizationId,assigneeId:actor.id,status:{in:['TODO','IN_PROGRESS']}}}))throw new ForbiddenException('Недостаточно прав');
+   if(user.role!=='EMPLOYEE'||!await tx.telegramLink.findFirst({where:{id:telegram.linkId,userId:actor.id,organizationId:actor.organizationId,selectedTaskId:telegram.taskId,selectedReceiptOrderId:null,selectedAt:{gt:new Date(Date.now()-900000)}}})||!await tx.businessTask.findFirst({where:{id:telegram.taskId,orderId:id,organizationId:actor.organizationId,assigneeId:actor.id,status:{in:['TODO','IN_PROGRESS']}}}))throw new ForbiddenException('Недостаточно прав');
   }
   const order=await tx.order.findFirst({where:{id,organizationId:actor.organizationId}});
   if(!order)throw new NotFoundException('Заказ не найден');

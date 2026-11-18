@@ -56,6 +56,25 @@ export const updateOrganizationSchema=organizationSchema.extend({version:z.numbe
 export type OrderInput = z.infer<typeof orderSchema>;
 export type PaymentInput = z.infer<typeof paymentSchema>;
 export type ExpenseInput = z.infer<typeof expenseSchema>;
+export const receiptDecisionSchema = z.discriminatedUnion('status', [
+  z.strictObject({ status: z.literal('APPROVED'), category: expenseSchema.shape.category }),
+  z.strictObject({ status: z.literal('REJECTED') }),
+]);
+export const receiptListSchema = z.strictObject({
+  status: z.enum(['PENDING', 'APPROVED', 'REJECTED']).default('PENDING'),
+  orderId: z.uuid().optional(),
+  page: z.string().regex(/^[1-9]\d{0,5}$/).transform(Number).default(1),
+});
+export interface ReceiptItem {
+  id: string;
+  amount: string;
+  description: string;
+  order: { id: string; number: number; title: string };
+  employee: { name: string };
+  createdAt: string;
+  reviewerName: string | null;
+  reviewedAt: string | null;
+}
 export const expenseLabels: Record<string, string> = { MATERIALS: 'Материалы', LABOR: 'Исполнители', TRANSPORT: 'Транспорт', RENT: 'Аренда', OTHER: 'Прочее' };
 
 export interface Client extends ClientInput { version:number; id: string; createdAt: string; ordersCount: number }

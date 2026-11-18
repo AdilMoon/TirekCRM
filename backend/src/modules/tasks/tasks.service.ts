@@ -79,7 +79,7 @@ export class TasksService {
    if(status==='CANCELLED'&&await tx.workBooking.findFirst({where:{taskId:id,organizationId:actor.organizationId,releasedAt:null}}))throw new ConflictException('Сначала отмените назначение в карточке заказа');
    if(['TODO','IN_PROGRESS'].includes(status)&&await tx.workBooking.findFirst({where:{taskId:id,releasedAt:{not:null}}}))throw new ConflictException('Освобождённое назначение нельзя вернуть через задачу');
    const task=await tx.businessTask.update({where:{id},data:{status,version:{increment:1}},select:taskSelect});
-   if(telegram&&status==='DONE')await tx.telegramLink.updateMany({where:{id:telegram.linkId,selectedTaskId:id},data:{selectedTaskId:null,selectedAt:null}});
+   if(telegram&&status==='DONE')await tx.telegramLink.updateMany({where:{id:telegram.linkId,selectedTaskId:id},data:{selectedTaskId:null,selectedAt:null,selectedReceiptOrderId:null}});
    await this.audit.record(tx,actor,'TASK',id,'TASK_STATUS_CHANGED',{title:task.title,from:previous.status,to:status,...(telegram?{source:'TELEGRAM'}:{})});
    await publishTaskNotification(tx,{organizationId:actor.organizationId,taskId:id,actorId:actor.id,actorName:actor.name,kind:'TASK_STATUS_CHANGED',eventKey:'task:'+id+':status:'+task.version});
    return task;

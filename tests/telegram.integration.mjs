@@ -6,6 +6,7 @@ import {randomUUID,randomBytes,randomInt,createHash} from 'node:crypto';
 import sharp from 'sharp';
 import {PrismaClient} from '@prisma/client';
 import {PrismaPg} from '@prisma/adapter-pg';
+import {ExpenseReceiptsService} from '../backend/dist/modules/finance/expense-receipts.service.js';
 import {TelegramService} from '../backend/dist/modules/telegram/telegram.service.js';
 import {TelegramProcessor} from '../backend/dist/modules/telegram/telegram-processor.js';
 import {TelegramWorker} from '../backend/dist/modules/telegram/telegram-worker.js';
@@ -23,7 +24,8 @@ class FakeTelegram {
  async send(chatId,text,buttons){if(this.fail){const code=this.fail;this.fail=0;throw new TelegramTransportError(code,1);}this.messages.push({chatId,text,buttons});return {message_id:this.messages.length};}
  async photo(){if(this.downloadHook){const hook=this.downloadHook;this.downloadHook=null;await hook();}return this.image;}
 }
-const fake=new FakeTelegram(),service=new TelegramService({client:db},fake,audit),processor=new TelegramProcessor({client:db},service,fake,passports,tasks),worker=new TelegramWorker({client:db},fake,processor,service);
+const receipts=new ExpenseReceiptsService({client:db},audit);
+const fake=new FakeTelegram(),service=new TelegramService({client:db},fake,audit),processor=new TelegramProcessor({client:db},service,fake,passports,tasks,receipts),worker=new TelegramWorker({client:db},fake,processor,service);
 let updateId=0;
 const update=(text,extra={})=>({update_id:++updateId,message:{message_id:updateId,date:Math.floor(Date.now()/1000),from:{id:Number(senderId),first_name:'Test Employee',username:'staff_fixture',language_code:'kk'},chat:{id:Number(senderId),type:'private'},...(text?{text}:{}),...extra}});
 const callback=data=>({update_id:++updateId,callback_query:{id:'fixture'+updateId,from:{id:Number(senderId),first_name:'Test Employee'},message:{message_id:999,from:{id:Number(botId),is_bot:true},chat:{id:Number(senderId),type:'private'}},data}});
@@ -56,8 +58,64 @@ test('Telegram employee binding notifications and result photos preserve identit
    await assert.rejects(()=>service.task(link.id,otherTask.id),status(404));await assert.rejects(()=>service.selectPhoto(link.id,otherTask.id),status(404));
    await processor.handle(callback('task:'+ownTask.id));const own=JSON.stringify(fake.messages.at(-1));for(const secret of ['+77009998877','secret client notes','12345.67'])assert.equal(own.includes(secret),false);
   });
+  await t.test('receipt submission, private review, concurrent approval and profitability',async()=>{
+   const p=new TelegramProcessor({client:db},service,fake,passports,tasks,receipts);
+   const outside=await user(otherOrg,'OWNER');
+   const path='/finance/receipts';
+   const photo=caption=>update(null,{caption,photo:[{file_id:'fixture',width:120,height:80}]});
+   const select=()=>p.handle(callback('receipt:'+ownTask.id));
+   fake.image=await sharp({create:{width:120,height:80,channels:3,background:'#ddd'}}).jpeg().toBuffer();
+   await p.card(link.id,ownTask.id);
+   assert.ok(fake.messages.at(-1).buttons.flat().some(b=>b.callback_data==='receipt:'+ownTask.id));
+   await select();
+   for(const caption of ['', '0', '-50', '5.499', '1 25,50', '100 USD']) await p.handle(photo(caption));
+   assert.equal(await db.expenseReceipt.count({where:{orderId:order.id}}),0);
+   await db.telegramLink.update({where:{id:link.id},data:{selectedAt:new Date(Date.now()-16*60000)}});
+   await p.handle(photo('10'));assert.equal(await db.expenseReceipt.count({where:{orderId:order.id}}),0);
+   await select();
+   fake.downloadHook=()=>db.businessTask.update({where:{id:ownTask.id},data:{assigneeId:colleague.id}});
+   await p.handle(photo('10'));assert.equal(await db.expenseReceipt.count({where:{orderId:order.id}}),0);
+   await db.businessTask.update({where:{id:ownTask.id},data:{assigneeId:employee.id}});
+   await select();
+   const first=photo('1 250,50 ₸\nМатериалы QA');
+   await p.handle(first);await p.handle(first);
+   await select();await p.handle(photo('1250.50'));
+   const where={organizationId:org,orderId:order.id};
+   assert.equal(await db.expenseReceipt.count({where}),1);
+   assert.equal(await db.orderPhoto.count({where}),0);
+   assert.equal(await db.expense.count({where}),0);
+   const list=(await req(path,undefined,owner.cookie,'GET')).body;
+   const item=list.items[0],url=path+'/'+item.id;
+   assert.equal(item.amount,'1250.50');assert.equal(item.description,'Материалы QA');assert.equal(item.image,undefined);
+   assert.equal((await req(path,undefined,employee.cookie,'GET')).status,403);
+   assert.equal((await req(path,undefined,outside.cookie,'GET')).body.total,0);
+   assert.equal((await req(url+'/photo',undefined,outside.cookie,'GET')).status,404);
+   assert.equal((await req(url+'/photo',undefined,employee.cookie,'GET')).status,403);
+   assert.equal((await req(url+'/photo',undefined,undefined,'GET')).status,401);
+   const image=await fetch((process.env.TEST_API_URL??'http://127.0.0.1:4000/api')+url+'/photo',{headers:{Cookie:owner.cookie}});
+   assert.equal(image.headers.get('cache-control'),'no-store');
+   assert.equal(image.headers.get('content-type'),'image/jpeg');
+   assert.equal((await sharp(Buffer.from(await image.arrayBuffer())).metadata()).format,'jpeg');
+   const decision={status:'APPROVED',category:'MATERIALS'};
+   assert.equal((await req(url,decision,employee.cookie,'PATCH')).status,403);
+   assert.equal((await req(url,decision,outside.cookie,'PATCH')).status,404);
+   assert.equal((await req(url,{...decision,amount:'10000'},owner.cookie,'PATCH')).status,400);
+   const review=await Promise.all([req(url,decision,owner.cookie,'PATCH'),req(url,decision,owner.cookie,'PATCH')]);
+   assert.equal(review[0].status,200);assert.deepEqual(review[0],review[1]);
+   assert.equal((await req(url,{status:'REJECTED'},owner.cookie,'PATCH')).status,409);
+   assert.equal(await db.expense.count({where}),1);
+   const profits=(await req('/orders/'+order.id+'/profitability',undefined,owner.cookie,'GET')).body;
+   assert.equal(profits.actual.expenses,'1250.50');assert.equal(profits.actual.profit,'11095.17');
+   fake.image=await sharp({create:{width:100,height:80,channels:3,background:'#abc'}}).jpeg().toBuffer();
+   await select();await p.handle(photo('3200'));
+   const next=(await req(path,undefined,owner.cookie,'GET')).body.items[0];
+   assert.equal((await req(path+'/'+next.id,{status:'REJECTED'},owner.cookie,'PATCH')).status,200);
+   assert.equal(await db.expense.count({where}),1);
+   await select();await p.handle(photo('32'));
+   assert.equal((await req(path,undefined,owner.cookie,'GET')).body.items[0].amount,'32.00');
+  });
   await t.test('status buttons enforce transitions versions replay safety and closed-photo explanations',async()=>{
-   const p=new TelegramProcessor({client:db},service,fake,passports,tasks),task=await db.businessTask.create({data:{organizationId:org,createdById:owner.id,assigneeId:employee.id,orderId:order.id,title:'Status button fixture'}});
+   const p=new TelegramProcessor({client:db},service,fake,passports,tasks,receipts),task=await db.businessTask.create({data:{organizationId:org,createdById:owner.id,assigneeId:employee.id,orderId:order.id,title:'Status button fixture'}});
    await p.card(link.id,task.id);assert.ok(fake.messages.at(-1).buttons.flat().some(b=>b.callback_data==='start:'+task.id+':1'));assert.equal(fake.messages.at(-1).buttons.flat().some(b=>b.callback_data.startsWith('done:')),false);
    const start=callback('start:'+task.id+':1');await p.handle(start);await p.handle(start);
    let current=await db.businessTask.findUniqueOrThrow({where:{id:task.id}});assert.equal(current.status,'IN_PROGRESS');assert.equal(current.version,2);assert.ok(fake.messages.at(-1).buttons.flat().some(b=>b.callback_data==='done:'+task.id+':2'));
@@ -107,7 +165,7 @@ test('Telegram employee binding notifications and result photos preserve identit
    await db.user.update({where:{id:employee.id},data:{isActive:false}});try{await assert.rejects(()=>tasks.status(employee,task.id,'IN_PROGRESS',1,context),status(403));}finally{await db.user.update({where:{id:employee.id},data:{isActive:true}});}
    await db.user.update({where:{id:employee.id},data:{role:'OWNER'}});try{await assert.rejects(()=>tasks.status(employee,task.id,'IN_PROGRESS',1,context),status(403));}finally{await db.user.update({where:{id:employee.id},data:{role:'EMPLOYEE'}});}
    const broken=new TasksService({client:db},{record:async()=>{throw Error('audit fixture');}});await assert.rejects(()=>broken.status(employee,task.id,'IN_PROGRESS',1,context));assert.equal((await db.businessTask.findUniqueOrThrow({where:{id:task.id}})).status,'TODO');
-   const relay={status:async(...args)=>{await service.disconnect(employee);return tasks.status(...args);}},p=new TelegramProcessor({client:db},service,fake,passports,relay);await p.handle(callback('start:'+task.id+':1'));assert.equal((await db.businessTask.findUniqueOrThrow({where:{id:task.id}})).status,'TODO');
+   const relay={status:async(...args)=>{await service.disconnect(employee);return tasks.status(...args);}},p=new TelegramProcessor({client:db},service,fake,passports,relay,receipts);await p.handle(callback('start:'+task.id+':1'));assert.equal((await db.businessTask.findUniqueOrThrow({where:{id:task.id}})).status,'TODO');
    pair=await service.pair(employee,'ru');await service.claim(botId,new URL(pair.url).searchParams.get('start'),{id:senderId,name:'Staff',username:''});link=await service.confirm(employee,pair.id,'ru');await assert.rejects(()=>tasks.status(employee,task.id,'IN_PROGRESS',1,context),status(403));
    assert.equal((await req('/tasks/'+task.id+'/status',{status:'IN_PROGRESS',version:1,telegram:context},employee.cookie,'PATCH')).status,400);
    const fresh={linkId:link.id,botId,telegramUserId:senderId};await Promise.all([tasks.status(employee,task.id,'IN_PROGRESS',1,fresh),tasks.status(employee,task.id,'IN_PROGRESS',1,fresh)]);assert.equal((await db.businessTask.findUniqueOrThrow({where:{id:task.id}})).version,2);assert.equal(await db.auditEvent.count({where:{organizationId:org,entityId:task.id,action:'TASK_STATUS_CHANGED'}}),1);
@@ -125,6 +183,6 @@ test('Telegram employee binding notifications and result photos preserve identit
   });
  }finally{
   await db.telegramUpdateReceipt.deleteMany({where:{botId}});await db.telegramBotState.deleteMany({where:{botId}});
-  for(const id of [org,otherOrg]){await db.businessTask.deleteMany({where:{organizationId:id}});await db.order.deleteMany({where:{organizationId:id}});await db.client.deleteMany({where:{organizationId:id}});await db.auditEvent.deleteMany({where:{organizationId:id}});await db.user.deleteMany({where:{organizationId:id}});await db.organization.deleteMany({where:{id}});}await db.$disconnect();
+  for(const id of [org,otherOrg]){await db.expenseReceipt.deleteMany({where:{organizationId:id}});await db.expense.deleteMany({where:{organizationId:id}});await db.businessTask.deleteMany({where:{organizationId:id}});await db.order.deleteMany({where:{organizationId:id}});await db.client.deleteMany({where:{organizationId:id}});await db.auditEvent.deleteMany({where:{organizationId:id}});await db.user.deleteMany({where:{organizationId:id}});await db.organization.deleteMany({where:{id}});}await db.$disconnect();
  }
 });

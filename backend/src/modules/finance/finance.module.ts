@@ -4,5 +4,8 @@ import {AuthModule} from '../../auth/auth.module';
 import {AuditModule} from '../audit/audit.module';
 import {FinanceController} from './finance.controller';
 import {FinanceService} from './finance.service';
-@Module({imports:[DatabaseModule,AuthModule,AuditModule],controllers:[FinanceController],providers:[FinanceService]})
+import { ExpenseReceiptsController } from './expense-receipts.controller';
+import { ExpenseReceiptsService } from './expense-receipts.service';
+@Module({imports:[DatabaseModule,AuthModule,AuditModule],controllers:[FinanceController,ExpenseReceiptsController],
+ providers:[FinanceService,ExpenseReceiptsService],exports:[ExpenseReceiptsService]})
 export class FinanceModule {}

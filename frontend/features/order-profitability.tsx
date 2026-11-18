@@ -5,6 +5,7 @@ import { orderProfitabilitySchema, type OrderCostColumn, type OrderProfitability
 import { Field, ModalShell } from '../components/ui';
 import { useI18n } from '../i18n/provider';
 import { api } from '../lib/api';
+import { ExpenseReceipts } from './expense-receipts';
 
 const measures = [
   ['labor', 'Стоимость труда'],
@@ -126,7 +127,8 @@ export function OrderProfitabilityPanel({ id, close }: { id: string; close: () =
         {missingRates > 0 && <p className="form-note">{t('Укажите фактическую ставку. Сотрудников с подтверждёнными часами без ставки: {0}', missingRates)}</p>}
       </div>
 
-      <form className="editor-form" onSubmit={submit} key={record.costVersion + ':' + load}>
+      <ExpenseReceipts orderId={id} onChange={refresh}/>
+      <form className="editor-form" onSubmit={submit} key={record.costVersion}>
         <h3>{t('Бюджет и ставки этого заказа')}</h3>
         <div className="form-row">
           <Field label={t('Плановая ставка за час, ₸')} name="plannedHourlyRate" defaultValue={record.plannedHourlyRate ?? ''} {...amountInput}/>

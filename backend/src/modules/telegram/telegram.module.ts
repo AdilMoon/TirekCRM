@@ -9,5 +9,6 @@ import {TelegramTransport} from './telegram-transport';
 import {TelegramProcessor} from './telegram-processor';
 import {TelegramWorker} from './telegram-worker';
 import {TelegramController} from './telegram.controller';
-@Module({imports:[DatabaseModule,AuthModule,AuditWriterModule,SmartOrdersModule,TasksModule],providers:[TelegramTransport,TelegramService,TelegramProcessor,TelegramWorker],controllers:[TelegramController]})
+import { FinanceModule } from '../finance/finance.module';
+@Module({imports:[DatabaseModule,AuthModule,AuditWriterModule,SmartOrdersModule,TasksModule,FinanceModule],providers:[TelegramTransport,TelegramService,TelegramProcessor,TelegramWorker],controllers:[TelegramController]})
 export class TelegramModule {}

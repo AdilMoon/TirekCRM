@@ -76,13 +76,13 @@ export class TelegramService {
   const [tasks,total]=await this.db.client.$transaction([this.db.client.businessTask.findMany({where,orderBy:[{createdAt:'desc'},{id:'desc'}],skip:(page-1)*5,take:5,select:{id:true,title:true}}),this.db.client.businessTask.count({where})]);
   return {tasks,total};
  }
- async selectPhoto(linkId:string,taskId:string){
+ async selectPhoto(linkId:string,taskId:string,receipt=false){
   return serializable(this.db.client,async tx=>{
    const link=await tx.telegramLink.findFirst({where:{id:linkId,user:{isActive:true,role:'EMPLOYEE'}}});
    if(!link)throw new ForbiddenException('Подключение Telegram отключено');
-   const task=await tx.businessTask.findFirst({where:{id:taskId,organizationId:link.organizationId,assigneeId:link.userId,status:{in:['TODO','IN_PROGRESS']},orderId:{not:null}}});
+   const task=await tx.businessTask.findFirst({where:{id:taskId,organizationId:link.organizationId,assigneeId:link.userId,status:{in:['TODO','IN_PROGRESS']},orderId:{not:null}},select:{orderId:true,order:{select:{number:true}}}});
    if(!task)throw new NotFoundException('Для фото нужна активная задача, связанная с заказом');
-   await tx.telegramLink.update({where:{id:linkId},data:{selectedTaskId:taskId,selectedAt:new Date()}});return task;
+   await tx.telegramLink.update({where:{id:linkId},data:{selectedTaskId:taskId,selectedAt:new Date(),selectedReceiptOrderId:receipt?task.orderId:null}});return task;
   });
  }
 }

@@ -70,6 +70,7 @@ model User {
   enteredWorkTime WorkTimeEntry[] @relation("WorkTimeCreator")
   closedWorkTimeMonths WorkTimeMonth[]
   orderLaborRates OrderLaborRate[]
+  submittedReceipts ExpenseReceipt[]
   @@unique([id, organizationId])
 }
 enum WorkTimeStatus {
@@ -224,6 +225,7 @@ model Order {
   actualHourlyRate Decimal? @db.Decimal(18,2)
   costVersion Int @default(1)
   laborRates OrderLaborRate[]
+  expenseReceipts ExpenseReceipt[]
   workTimeAllocations WorkTimeAllocation[]
   @@unique([organizationId, number])
   @@unique([id, organizationId])
@@ -301,12 +303,40 @@ model Expense {
   idempotencyKey String @db.Uuid
   createdAt      DateTime @default(now())
   reversal ExpenseReversal?
+  receipt ExpenseReceipt?
   replaces ExpenseReversal? @relation("ExpenseReplacement")
   @@index([organizationId, orderId])
   @@unique([id, organizationId])
   @@unique([organizationId, idempotencyKey])
   @@index([organizationId, createdAt])
   @@index([organizationId, createdAt, id])
+}
+enum ReceiptStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+model ExpenseReceipt {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  orderId String @db.Uuid
+  employeeId String @db.Uuid
+  order Order @relation(fields:[orderId,organizationId],references:[id,organizationId],onDelete:Restrict)
+  employee User @relation(fields:[employeeId,organizationId],references:[id,organizationId],onDelete:Restrict)
+  sourceKey String @unique @db.Uuid
+  image Bytes
+  imageHash String @db.Char(64)
+  amount Decimal @db.Decimal(14,2)
+  description String @db.VarChar(200)
+  status ReceiptStatus @default(PENDING)
+  createdAt DateTime @default(now())
+  reviewedAt DateTime?
+  reviewerName String?
+  expenseId String? @db.Uuid
+  expense Expense? @relation(fields:[expenseId,organizationId],references:[id,organizationId],onDelete:Restrict)
+  @@unique([expenseId,organizationId])
+  @@index([organizationId,status,createdAt,id])
+  @@index([orderId,organizationId])
 }
 model Document {
   id             String @id @default(uuid()) @db.Uuid
@@ -489,6 +519,7 @@ model TelegramLink {
  username String @db.VarChar(32)
  locale String @default("ru") @db.VarChar(2)
  selectedTaskId String? @db.Uuid
+ selectedReceiptOrderId String? @db.Uuid
  selectedAt DateTime?
  createdAt DateTime @default(now())
  deliveries TelegramDelivery[]

@@ -6,11 +6,13 @@ import { Field, ModalShell } from '../components/ui';
 import { useI18n } from '../i18n/provider';
 import { api } from '../lib/api';
 import { ExpenseReceipts } from './expense-receipts';
+import {RepeatVisits} from './repeat-visits';
 import { MaterialLots } from './material-lots';
 
 const measures = [
   ['labor', 'Стоимость труда'],
   ['expenses', 'Прямые расходы'],
+  ['rework', 'Стоимость повторных выездов'],
   ['cost', 'Себестоимость'],
   ['profit', 'Прибыль'],
   ['marginPercent', 'Маржа'],
@@ -20,6 +22,7 @@ export function OrderProfitabilityPanel({ id, close }: { id: string; close: () =
   const { t, formatMoney, language } = useI18n();
   const path = '/orders/' + id + '/profitability';
   const [record, setRecord] = useState<OrderProfitability | null>(null);
+  const [visit,setVisit]=useState('');
   const [load, setLoad] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -84,6 +87,7 @@ export function OrderProfitabilityPanel({ id, close }: { id: string; close: () =
   const missingRates = record?.actualHourlyRate === null
     ? record.contributors.filter(person => person.hourlyRate === null).length : 0;
 
+  if(visit) return <OrderProfitabilityPanel key={visit} id={visit} close={()=>{setVisit('');refresh();}}/>;
   return <ModalShell title={t('Прибыльность заказа')} onClose={close} busy={saving}>
     {error && <p className="alert" role="alert">{t(error)} <button onClick={refresh}>{t('Обновить')}</button></p>}
     {saved && <p className="schedule-success" role="status">{t('Параметры прибыльности сохранены')}</p>}
@@ -129,6 +133,7 @@ export function OrderProfitabilityPanel({ id, close }: { id: string; close: () =
       </div>
 
       <ExpenseReceipts orderId={id} onChange={refresh}/>
+      <RepeatVisits record={record} open={setVisit} refresh={refresh}/>
       <MaterialLots orderId={id} revision={load} onChange={refresh}/>
       <form className="editor-form" onSubmit={submit} key={record.costVersion}>
         <h3>{t('Бюджет и ставки этого заказа')}</h3>

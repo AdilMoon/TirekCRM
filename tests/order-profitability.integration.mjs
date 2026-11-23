@@ -100,7 +100,7 @@ test('profitability isolates rates and uses exact net costs and approved labor',
       assert.equal(initial.actualMinutes, 120);
       assert.equal(initial.pendingMinutes, 60);
       assert.equal(initial.costVersion, main.costVersion);
-      assert.deepEqual(initial.actual, { labor: null, expenses: '211.44', cost: null, profit: null, marginPercent: null });
+      assert.deepEqual(initial.actual, { rework: '0.00', labor: null, expenses: '211.44', cost: null, profit: null, marginPercent: null });
       assert.equal(initial.planned.cost, null);
       assert.equal(initial.forecast.atCompletion.profit, null);
       assert.equal(initial.forecast.remainingExpenses, null);
@@ -124,9 +124,9 @@ test('profitability isolates rates and uses exact net costs and approved labor',
       assert.equal(detail.revenue, '1000.00');
       assert.equal(detail.actualRevenue, detail.revenue);
       assert.equal((await request(owner, '/orders/' + main.id)).version, main.version);
-      assert.deepEqual(detail.planned, { labor: '240.30', expenses: '100.20', cost: '340.50', profit: '659.50', marginPercent: '65.95' });
-      assert.deepEqual(detail.actual, { labor: '500.02', expenses: '150.25', cost: '650.27', profit: '349.73', marginPercent: '34.97' });
-      assert.deepEqual(detail.forecast.atCompletion, { labor: '700.03', expenses: '150.25', cost: '850.28', profit: '149.72', marginPercent: '14.97' });
+      assert.deepEqual(detail.planned, { rework: '0.00', labor: '240.30', expenses: '100.20', cost: '340.50', profit: '659.50', marginPercent: '65.95' });
+      assert.deepEqual(detail.actual, { rework: '0.00', labor: '500.02', expenses: '150.25', cost: '650.27', profit: '349.73', marginPercent: '34.97' });
+      assert.deepEqual(detail.forecast.atCompletion, { rework: '0.00', labor: '700.03', expenses: '150.25', cost: '850.28', profit: '149.72', marginPercent: '14.97' });
       assert.equal(detail.forecast.remainingMinutes, 0);
       assert.equal(detail.forecast.remainingExpenses, '0.00');
       assert.deepEqual(detail.contributors.map(row => [row.employeeId, row.approvedMinutes, row.hourlyRate]), [[a.id, 90, null], [b.id, 30, '400.01']]);
@@ -141,7 +141,7 @@ test('profitability isolates rates and uses exact net costs and approved labor',
       const before = await request(owner, path);
       assert.equal(before.forecast.remainingMinutes, 60);
       assert.equal(before.forecast.remainingExpenses, '149.75');
-      assert.deepEqual(before.forecast.atCompletion, { labor: '900.04', expenses: '300.00', cost: '1200.04', profit: '-200.04', marginPercent: '-20.00' });
+      assert.deepEqual(before.forecast.atCompletion, { rework: '0.00', labor: '900.04', expenses: '300.00', cost: '1200.04', profit: '-200.04', marginPercent: '-20.00' });
       await db.order.update({ where: { id: main.id }, data: { status: 'COMPLETED' } });
       const finished = await request(owner, path);
       assert.equal(finished.forecast.remainingMinutes, 0);
@@ -178,7 +178,7 @@ test('profitability isolates rates and uses exact net costs and approved labor',
       const detail = await request(owner, path);
       const updated = await budget({ ...basis, costVersion: detail.costVersion, actualHourlyRate: '500.01', rates: [{ employeeId: b.id, hourlyRate: null }] });
       const loss = await request(owner, path);
-      assert.deepEqual(loss.actual, { labor: '1000.02', expenses: '150.25', cost: '1150.27', profit: '-150.27', marginPercent: '-15.03' });
+      assert.deepEqual(loss.actual, { rework: '0.00', labor: '1000.02', expenses: '150.25', cost: '1150.27', profit: '-150.27', marginPercent: '-15.03' });
       assert.equal(await db.orderLaborRate.count({ where: { orderId: main.id } }), 0);
       await budget({ ...basis, costVersion: updated.costVersion, actualHourlyRate: '0', rates: [] });
       assert.equal((await request(owner, path)).actual.labor, '0.00');
@@ -191,7 +191,7 @@ test('profitability isolates rates and uses exact net costs and approved labor',
       assert.equal(cancelled.revenue, '1000.00');
       assert.equal(cancelled.planned.profit, '659.50');
       assert.equal(cancelled.actualRevenue, '0.00');
-      assert.deepEqual(cancelled.actual, { labor: '0.00', expenses: '150.25', cost: '150.25', profit: '-150.25', marginPercent: null });
+      assert.deepEqual(cancelled.actual, { rework: '0.00', labor: '0.00', expenses: '150.25', cost: '150.25', profit: '-150.25', marginPercent: null });
       assert.deepEqual(cancelled.forecast.atCompletion, cancelled.actual);
     });
   } finally {

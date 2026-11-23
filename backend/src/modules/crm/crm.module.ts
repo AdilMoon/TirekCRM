@@ -5,5 +5,7 @@ import { AuditModule } from '../audit/audit.module';
 import { ApiController } from './crm.controller';
 import { CrmService } from './crm.service';
 import { SearchService } from './search.service';
-@Module({imports:[DatabaseModule,AuthModule,AuditModule],controllers:[ApiController],providers:[CrmService,SearchService]})
+import {OrderQualityService} from './order-quality.service';
+import {OrderQualityController} from './order-quality.controller';
+@Module({imports:[DatabaseModule,AuthModule,AuditModule],controllers:[ApiController,OrderQualityController],providers:[CrmService,SearchService,OrderQualityService]})
 export class CrmModule {}

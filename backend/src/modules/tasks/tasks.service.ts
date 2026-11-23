@@ -6,6 +6,7 @@ import { AuditService } from '../audit/audit.service';
 import type { AuthRequest } from '../../auth/session.guard';
 import { serializable } from '../../common/transaction';
 import { publishTaskNotification,removeFormerAssigneeNotifications } from '../notifications/notification-writer';
+import {requireAcceptance,readAcceptance,checkAcceptance} from './acceptance';
 type Actor=AuthRequest['user'];
 // Deliberately select only operational fields: employees never receive financial or client data.
 const taskSelect={id:true,title:true,description:true,status:true,version:true,dueDate:true,createdAt:true,updatedAt:true,
@@ -14,6 +15,17 @@ const taskSelect={id:true,title:true,description:true,status:true,version:true,d
 @Injectable()
 export class TasksService {
  constructor(private readonly db:Database,private readonly audit:AuditService) {}
+ acceptance(actor:Actor,orderId:string) {
+  return this.db.client.$transaction(tx=>readAcceptance(tx,actor,orderId),{isolationLevel:Prisma.TransactionIsolationLevel.RepeatableRead});
+ }
+ checkAcceptance(actor:Actor,orderId:string,input:{version:number;itemId:string;checked:boolean},
+   telegram:{linkId:string;botId:string;telegramUserId:string}) {
+  return serializable(this.db.client,async tx=>{
+   if(!await tx.telegramLink.findFirst({where:{id:telegram.linkId,userId:actor.id,organizationId:actor.organizationId,
+     botId:telegram.botId,telegramUserId:telegram.telegramUserId}})) throw new ForbiddenException();
+   return checkAcceptance(tx,this.audit,actor,orderId,input);
+  });
+ }
  private scope(actor:Actor):Prisma.BusinessTaskWhereInput {
   return {organizationId:actor.organizationId,...(actor.role==='EMPLOYEE'?{assigneeId:actor.id}:{})};
  }
@@ -76,6 +88,7 @@ export class TasksService {
    const employeeTransitions:Record<TaskStatus,TaskStatus[]>={TODO:['IN_PROGRESS'],IN_PROGRESS:['TODO','DONE'],DONE:[],CANCELLED:[]};
    if(actor.role==='EMPLOYEE'&&!employeeTransitions[previous.status].includes(status))throw new ForbiddenException('Этот переход задачи недоступен');
    if(previous.status===status)return tx.businessTask.findUniqueOrThrow({where:{id},select:taskSelect});
+   if(status==='DONE' && previous.orderId) await requireAcceptance(tx,actor.organizationId,previous.orderId);
    if(status==='CANCELLED'&&await tx.workBooking.findFirst({where:{taskId:id,organizationId:actor.organizationId,releasedAt:null}}))throw new ConflictException('Сначала отмените назначение в карточке заказа');
    if(['TODO','IN_PROGRESS'].includes(status)&&await tx.workBooking.findFirst({where:{taskId:id,releasedAt:{not:null}}}))throw new ConflictException('Освобождённое назначение нельзя вернуть через задачу');
    const task=await tx.businessTask.update({where:{id},data:{status,version:{increment:1}},select:taskSelect});

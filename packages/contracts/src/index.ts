@@ -2,6 +2,7 @@ import { z } from 'zod';
 export * from './work-time';
 export * from './order-quotes';
 export * from './order-profitability';
+export * from './acceptance';
 
 export const stages = ['NEW', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'] as const;
 export type Stage = typeof stages[number];

@@ -12,6 +12,7 @@ import { cents, money, totalForItems } from '../../common/money';
 import { orderTermsHash } from '../../common/order-terms';
 import {releaseBooking} from '../scheduling/booking-writer';
 import {almatyTime} from '../scheduling/planner';
+import {requireAcceptance} from '../tasks/acceptance';
 
 export const orderInclude = { client: true, items: true, ...paymentsWithRefunds } satisfies Prisma.OrderInclude;
 type FullOrder = Prisma.OrderGetPayload<{ include: typeof orderInclude }>;
@@ -76,6 +77,7 @@ export class CrmService {
     return this.transaction(async tx=>{
       const previous=await tx.order.findFirst({where:{id,organizationId:org},include:orderInclude});
       if(!previous)throw new NotFoundException('Заказ не найден');
+      if(previous.repeatOfId)throw new ConflictException('Бесплатный повторный выезд нельзя превратить в платный заказ');
       if(previous.version!==input.version)throw new ConflictException('Заказ уже изменён. Откройте его заново');
       if(['COMPLETED','CANCELLED'].includes(previous.status))throw new ConflictException('Завершённый или отменённый заказ нельзя редактировать');
       const booking=await tx.workBooking.findFirst({where:{orderId:id,organizationId:org,releasedAt:null}});
@@ -137,6 +139,7 @@ export class CrmService {
         select: { id: true },
       })) throw new ConflictException('Ожидается согласование сметы по ссылке');
       if (status === 'CANCELLED' && paidCents(order.payments)>0n) throw new ConflictException('Для отмены заказа сначала верните оставшуюся оплату');
+      if (status === 'COMPLETED') await requireAcceptance(tx,org,id);
       const updated=await tx.order.update({where:{id},data:{status,version:{increment:1}},include:orderInclude});
       if(status==='COMPLETED'||status==='CANCELLED'){
        const booking=await tx.workBooking.findFirst({where:{orderId:id,organizationId:org,releasedAt:null}});

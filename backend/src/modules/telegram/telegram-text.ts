@@ -16,6 +16,7 @@ const words={
  connect:['Откройте личную ссылку подключения в TirekCRM → Telegram.','TirekCRM → Telegram бөлімінде жеке қосылу сілтемесін ашыңыз.','Open your personal connection link in TirekCRM → Telegram.'],
  confirm:['Вернитесь в TirekCRM, обновите состояние, проверьте Telegram-профиль и подтвердите подключение.','TirekCRM-ге оралып, күйді жаңартыңыз, Telegram профилін тексеріп, қосылуды растаңыз.','Return to TirekCRM, refresh the status, check the Telegram profile and confirm the connection.'],
  invalid:['Ссылка недоступна. Создайте новую ссылку подключения в CRM.','Сілтеме қолжетімсіз. CRM ішінде жаңа қосылу сілтемесін жасаңыз.','The link is unavailable. Create a new connection link in CRM.'],
+ acceptance:['Приёмка · * обязательный пункт','Қабылдау · * міндетті тармақ','Acceptance · * required item'],
  tasks:['Ваши активные задачи','Белсенді тапсырмаларыңыз','Your active tasks'],empty:['Активных задач нет.','Белсенді тапсырмалар жоқ.','No active tasks.'],
  photo:['Фото результата','Нәтиже фотосы','Result photo'],
  select:['Отправьте фото обычным изображением в этот чат в течение 15 минут. Оно сохранится в CRM как приватное фото результата. /cancel — отменить выбор.','15 минут ішінде осы чатқа кәдімгі сурет жіберіңіз. Ол CRM-де нәтиженің жеке фотосы ретінде сақталады. /cancel — таңдауды болдырмау.','Send a regular photo to this chat within 15 minutes. It will be saved in CRM as a private result photo. /cancel clears the selection.'],

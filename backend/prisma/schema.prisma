@@ -196,6 +196,12 @@ model Client {
   @@index([organizationId, createdAt, id])
 }
 model Order {
+  acceptance OrderAcceptance?
+  repeatOfId String? @db.Uuid
+  repeatOf Order? @relation("RepeatVisits", fields:[repeatOfId,organizationId], references:[id,organizationId], onDelete:Restrict, onUpdate:NoAction)
+  repeatVisits Order[] @relation("RepeatVisits")
+  repeatKey String? @db.Uuid
+  repeatRequestHash String? @db.Char(64)
   materialMovements MaterialMovement[]
   bookings WorkBooking[]
   id             String @id @default(uuid()) @db.Uuid
@@ -229,9 +235,19 @@ model Order {
   expenseReceipts ExpenseReceipt[]
   workTimeAllocations WorkTimeAllocation[]
   @@unique([organizationId, number])
+  @@unique([organizationId, repeatKey])
+  @@index([organizationId, repeatOfId])
   @@unique([id, organizationId])
   @@index([organizationId, status, createdAt])
   @@index([organizationId, createdAt, id])
+}
+model OrderAcceptance {
+  orderId String @id @db.Uuid
+  organizationId String @db.Uuid
+  order Order @relation(fields:[orderId,organizationId], references:[id,organizationId], onDelete:Cascade)
+  version Int @default(1)
+  items Json @default("[]")
+  @@unique([orderId,organizationId])
 }
 model OrderLaborRate {
   organizationId String @db.Uuid

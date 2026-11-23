@@ -16,6 +16,7 @@ export const orderProfitabilitySchema = z.strictObject({
 export type OrderProfitabilityInput = z.infer<typeof orderProfitabilitySchema>;
 
 export interface OrderCostColumn {
+  rework: string | null;
   labor: string | null;
   expenses: string | null;
   cost: string | null;
@@ -24,6 +25,9 @@ export interface OrderCostColumn {
 }
 
 export interface OrderProfitability {
+  status: string;
+  repeatOfId: string | null;
+  repeatVisits: {id:string;number:number;title:string;status:string;reason:string;actualCost:string|null;forecastCost:string|null}[];
   id: string;
   number: number;
   title: string;

@@ -10,7 +10,7 @@ import { orderTimeContributors } from './order-time-totals';
 
 type Actor = AuthRequest['user'];
 const select = {
-  id: true, number: true, title: true, costVersion: true, total: true, status: true, plannedMinutes: true,
+  id: true, number: true, title: true, repeatOfId: true, costVersion: true, total: true, status: true, plannedMinutes: true,
   plannedHourlyRate: true, plannedDirectExpenses: true, actualHourlyRate: true,
 } as const;
 type OrderInputs = Prisma.OrderGetPayload<{ select: typeof select }>;
@@ -27,11 +27,11 @@ function roundedDivide(numerator: bigint, denominator: bigint): bigint {
   return (numerator + denominator / 2n) / denominator;
 }
 
-function costColumn(revenue: bigint, labor: bigint | null, expenses: bigint | null): OrderCostColumn {
-  const cost = labor === null || expenses === null ? null : labor + expenses;
+function costColumn(revenue: bigint, labor: bigint | null, expenses: bigint | null, rework: bigint | null = 0n): OrderCostColumn {
+  const cost = labor === null || expenses === null || rework === null ? null : labor + expenses + rework;
   const profit = cost === null ? null : revenue - cost;
   return {
-    labor: asMoney(labor), expenses: asMoney(expenses), cost: asMoney(cost), profit: asMoney(profit),
+    rework: asMoney(rework), labor: asMoney(labor), expenses: asMoney(expenses), cost: asMoney(cost), profit: asMoney(profit),
     marginPercent: revenue > 0n && profit !== null ? money(roundedDivide(profit * 10000n, revenue)) : null,
   };
 }
@@ -47,8 +47,11 @@ export class OrderProfitabilityService {
   }
 
   detail(actor: Actor, id: string): Promise<OrderProfitability> {
+    return this.db.client.$transaction(tx => this.calculate(tx,actor,id), {isolationLevel:Prisma.TransactionIsolationLevel.RepeatableRead});
+  }
+
+  private async calculate(tx:Prisma.TransactionClient,actor:Actor,id:string):Promise<OrderProfitability> {
     const organizationId = actor.organizationId;
-    return this.db.client.$transaction(async tx => {
       const order = await this.order(tx, actor, id);
       const time = await orderTimeContributors(tx, organizationId, id);
       const rates = await tx.orderLaborRate.findMany({
@@ -61,6 +64,13 @@ export class OrderProfitabilityService {
           ON r."expenseId" = e.id AND r."organizationId" = e."organizationId"
         WHERE e."orderId" = ${id}::uuid AND e."organizationId" = ${organizationId}::uuid`);
 
+      const visits=order.repeatOfId ? [] : await tx.order.findMany({where:{organizationId,repeatOfId:id},
+        select:{id:true,notes:true,status:true},orderBy:[{createdAt:'asc'},{id:'asc'}]});
+      const visitCosts=await Promise.all(visits.map(visit=>this.calculate(tx,actor,visit.id)));
+      const sumCosts=(values:(string|null)[])=>values.some(value=>value===null) ? null :
+        values.reduce<bigint>((sum,value)=>sum+cents(value!),0n);
+      const actualRework=sumCosts(visitCosts.map(visit=>visit.actual.cost));
+      const forecastRework=sumCosts(visitCosts.map(visit=>visit.forecast.atCompletion.cost));
       const budget = amounts(order);
       const byEmployee = new Map(rates.map(rate => [rate.employeeId, rate.hourlyRate.toFixed(2)]));
       const contributors = time.filter(row => row.actualMinutes > 0n).map(row => ({
@@ -105,19 +115,21 @@ export class OrderProfitabilityService {
           forecastLabor + BigInt(remainingMinutes) * cents(remainingRate);
       }
       return {
+        repeatOfId:order.repeatOfId,status:order.status,
+        repeatVisits:visitCosts.map((visit,index)=>({id:visit.id,number:visit.number,title:visit.title,status:visits[index].status,
+          reason:visits[index].notes,actualCost:visit.actual.cost,forecastCost:visit.forecast.atCompletion.cost})),
         id, number: order.number, title: order.title, costVersion: order.costVersion, revenue: money(revenue),
         actualRevenue: money(actualRevenue),
         plannedMinutes: order.plannedMinutes, actualMinutes: Number(actualMinutes), pendingMinutes: Number(pendingMinutes), ...budget,
         planned: costColumn(revenue, plannedLabor, expenseBudget),
-        actual: costColumn(actualRevenue, actualLabor === null ? null : roundedDivide(actualLabor, 60n), incurredExpenses),
+        actual: costColumn(actualRevenue, actualLabor === null ? null : roundedDivide(actualLabor, 60n), incurredExpenses,actualRework),
         forecast: {
           atCompletion: costColumn(actualRevenue, forecastLabor === null ? null : roundedDivide(forecastLabor, 60n),
-            remainingExpenses === null ? null : incurredExpenses + remainingExpenses),
-          remainingMinutes, remainingHourlyRate: remainingRate, remainingExpenses: asMoney(remainingExpenses), closed,
+            remainingExpenses === null ? null : incurredExpenses + remainingExpenses,forecastRework),
+          remainingMinutes, remainingHourlyRate: remainingRate, remainingExpenses: asMoney(remainingExpenses), closed:closed&&visitCosts.every(visit=>visit.forecast.closed),
         },
         contributors: contributors.map(({ minutes, ...row }) => ({ ...row, approvedMinutes: Number(minutes) })),
       };
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
   }
 
   save(actor: Actor, id: string, input: OrderProfitabilityInput) {

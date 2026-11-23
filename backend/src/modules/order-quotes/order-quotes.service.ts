@@ -12,7 +12,7 @@ import { AuditService, type Actor } from '../audit/audit.service';
 import { publishQuoteNotifications } from '../notifications/notification-writer';
 
 const orderTerms = {
-  id: true, organizationId: true, clientId: true, title: true, number: true, version: true, status: true, total: true,
+  id: true, organizationId: true, clientId: true, title: true, number: true, version: true, status: true, total: true, repeatOfId:true,
   organization: { select: { name: true } },
   items: { orderBy: { id: 'asc' }, select: { description: true, quantity: true, unitPrice: true } },
 } satisfies Prisma.OrderSelect;
@@ -82,6 +82,7 @@ export class OrderQuotesService {
       await this.owner(tx, actor);
       const order = await this.order(tx, actor, id);
       if (!open(order)) throw new ConflictException('Смета доступна для открытого заказа');
+      if(order.repeatOfId) throw new ConflictException('Для платных работ создайте отдельное согласование в исходном заказе');
       if (order.version !== input.orderVersion) throw new ConflictException('Заказ уже изменён. Откройте его заново');
       const now = new Date();
       const where = { orderId: id, organizationId: actor.organizationId };

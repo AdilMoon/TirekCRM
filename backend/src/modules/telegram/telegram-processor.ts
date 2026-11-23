@@ -20,6 +20,17 @@ export class TelegramProcessor {
  private readonly budgets=new Map<string,{at:number;count:number}>();
  constructor(private readonly db:Database,private readonly service:TelegramService,private readonly transport:TelegramTransport,private readonly passports:PassportService,private readonly tasks:TasksService,private readonly receipts:ExpenseReceiptsService){}
  private allowed(sender:string){const now=Date.now(),old=this.budgets.get(sender);if(!old||old.at<now-60000){if(this.budgets.size>=10000)this.budgets.clear();this.budgets.set(sender,{at:now,count:1});return true;}return ++old.count<=20;}
+ async acceptanceCard(linkId:string,taskId:string) {
+  const {link,task}=await this.service.task(linkId,taskId,true);
+  if(!task.orderId) throw new NotFoundException();
+  const binding=await this.service.binding(link.botId,link.telegramUserId);
+  if(!binding) throw new NotFoundException();
+  const state=await this.tasks.acceptance(binding.user,task.orderId);
+  return this.transport.send(link.telegramUserId,tgText(link.locale,'acceptance'),
+    [...state.items.map((item,index)=>[{text:(item.checked?'✓ ':'☐ ')+(item.required?'* ':'')+item.label.slice(0,48),
+      callback_data:'qa:'+taskId+':'+index+':'+state.version+':'+(item.checked?'0':'1')}]),
+      [{text:tgText(link.locale,'open'),callback_data:'task:'+taskId}]]);
+ }
  async card(linkId:string,taskId:string,assigned=false){
   const {link,task}=await this.service.task(linkId,taskId,!assigned),locale=link.locale,active=task.status==='TODO'||task.status==='IN_PROGRESS';
   let text=(assigned?tgText(locale,'assigned')+'\n':'')+task.title+'\n'+tgText(locale,task.status==='TODO'?'todo':task.status==='IN_PROGRESS'?'inProgress':task.status==='DONE'?'done':'cancelledTask');
@@ -27,7 +38,7 @@ export class TelegramProcessor {
   else if(task.dueDate)text+='\n'+new Intl.DateTimeFormat(locale==='kk'?'kk-KZ':locale==='en'?'en-GB':'ru-KZ',{timeZone:'Asia/Almaty',day:'numeric',month:'short'}).format(task.dueDate);
   if(task.description)text+='\n\n'+task.description.slice(0,1500);
   if(task.status==='IN_PROGRESS'&&task.orderId)text+='\n\n'+tgText(locale,'photoBeforeDone');
-  return this.transport.send(link.telegramUserId,text,[...(active?[[{text:tgText(locale,task.status==='TODO'?'startWork':'finishTask'),callback_data:(task.status==='TODO'?'start:':'done:')+task.id+':'+task.version}]]:[]),...(active&&task.orderId?[[{text:tgText(locale,'photo'),callback_data:'photo:'+task.id}],[{text:tgText(locale,'receipt'),callback_data:'receipt:'+task.id}]]:[]),[{text:tgText(locale,'tasks'),callback_data:'list:1'}]]);
+   return this.transport.send(link.telegramUserId,text,[...(active?[[{text:tgText(locale,task.status==='TODO'?'startWork':'finishTask'),callback_data:(task.status==='TODO'?'start:':'done:')+task.id+':'+task.version}]]:[]),...(active&&task.orderId?[[{text:tgText(locale,'acceptance'),callback_data:'accept:'+task.id}],[{text:tgText(locale,'photo'),callback_data:'photo:'+task.id}],[{text:tgText(locale,'receipt'),callback_data:'receipt:'+task.id}]]:[]),[{text:tgText(locale,'tasks'),callback_data:'list:1'}]]);
  }
  async quoteApproved(linkId:string,taskId:string,quoteId:string){
   const {link,task}=await this.service.task(linkId,taskId);
@@ -71,10 +82,31 @@ export class TelegramProcessor {
   const locale=link.locale;
   try{
    const data=callback?.data??'';
+   const quality=/^qa:([a-f0-9-]{36}):(\d{1,2}):(\d{1,10}):([01])$/.exec(data);
+   if(data.startsWith('accept:') && z.uuid().safeParse(data.slice(7)).success) {
+    await this.acceptanceCard(link.id,data.slice(7));return;
+   }
+   if(quality) {
+    const [,taskId,index,version,checked]=quality;
+    const {task}=await this.service.task(link.id,taskId,true);
+    if(!task.orderId) throw new NotFoundException();
+    const state=await this.tasks.acceptance(link.user,task.orderId);
+    const item=state.items[Number(index)];
+    if(!item || state.version!==Number(version)) {
+      await this.acceptanceCard(link.id,taskId);return;
+    }
+    await this.tasks.checkAcceptance(link.user,task.orderId,{version:state.version,itemId:item.id,checked:checked==='1'},
+      {linkId:link.id,botId,telegramUserId:senderId});
+    await this.acceptanceCard(link.id,taskId);return;
+   }
    const action=parseTaskAction(data);
    if(action){
     try{await this.tasks.status(link.user,action.taskId,action.status,action.version,{linkId:link.id,botId,telegramUserId:senderId});}
-    catch(error){if(error instanceof HttpException&&error.getStatus()===409){await this.transport.send(senderId,tgText(locale,'staleAction'),[[{text:tgText(locale,'tasks'),callback_data:'list:1'}]]);return;}throw error;}
+    catch(error){
+     if(error instanceof HttpException&&error.message==='Сначала выполните обязательные пункты приёмки'){
+      await this.acceptanceCard(link.id,action.taskId);return;
+     }
+     if(error instanceof HttpException&&error.getStatus()===409){await this.transport.send(senderId,tgText(locale,'staleAction'),[[{text:tgText(locale,'tasks'),callback_data:'list:1'}]]);return;}throw error;}
     await this.card(link.id,action.taskId);return;
    }
    if(command==='/cancel'){await this.db.client.telegramLink.updateMany({where:{id:link.id},data:{selectedAt:null,selectedTaskId:null,selectedReceiptOrderId:null}});await this.transport.send(senderId,tgText(locale,'cancelled'));return;}

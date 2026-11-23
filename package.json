@@ -32,6 +32,11 @@
     "check:structure": "node scripts/check-structure.mjs",
     "test:i18n": "node --test tests/localization.test.mjs"
   },
+  "overrides": {
+    "@prisma/config": {
+      "effect": "3.22.1"
+    }
+  },
   "devDependencies": {
     "@playwright/test": "^1.56.0",
     "embedded-postgres": "18.4.0-beta.17",

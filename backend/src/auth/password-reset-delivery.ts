@@ -31,7 +31,7 @@ export class PasswordResetDelivery {
     const id=randomUUID(),temporary=join(localResetMailbox,id+'.tmp'),file=join(localResetMailbox,id+'.json');
     try{
       // Local development only. Never put the bearer token into logs or HTTP responses.
-      await writeFile(temporary,JSON.stringify({to:message.to,subject:'Tirek: восстановление пароля',token:message.token,expiresAt:message.expiresAt.toISOString(),confirmationEndpoint:webOrigin()+'/api/auth/password-reset/confirm'},null,2),{flag:'wx',mode:0o600});
+      await writeFile(temporary,JSON.stringify({to:message.to,subject:'Tirek: восстановление пароля',token:message.token,expiresAt:message.expiresAt.toISOString(),confirmationEndpoint:webOrigin()+'/api/auth/password-reset/confirm',resetUrl:webOrigin()+'/reset-password#token='+message.token},null,2),{flag:'wx',mode:0o600});
       await rename(temporary,file);
     }finally{await unlink(temporary).catch(error=>{if(error.code!=='ENOENT')throw error;});}
   }

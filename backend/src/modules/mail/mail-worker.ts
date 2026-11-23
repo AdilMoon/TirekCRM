@@ -34,7 +34,7 @@ export class MailWorker implements OnModuleInit,OnModuleDestroy {
           if(!row.expiresAt||row.expiresAt<=new Date()||!reset||reset.expiresAt<=new Date()||reset.tokenHash!==digest(token)||!reset.user.isActive||reset.credentialHash!==digest(reset.user.passwordHash)){
             await this.db.client.mailMessage.updateMany({where:lease,data:{status:'SKIPPED',payload:null,leaseToken:null,leaseUntil:null}});continue;
           }
-          subject='Tirek: восстановление пароля';text=`Запрошено восстановление пароля TirekCRM. Одноразовый токен: ${token}\nДействует до ${row.expiresAt.toISOString()}.\nПодтверждение: POST ${webOrigin()}/api/auth/password-reset/confirm\nЕсли запрос сделали не вы, ничего не предпринимайте.`;
+          subject='Tirek: восстановление пароля';text=`Запрошено восстановление пароля TirekCRM. Откройте ссылку и задайте новый пароль: ${webOrigin()}/reset-password#token=${token}\nДействует до ${row.expiresAt.toISOString()}.\nЕсли запрос сделали не вы, ничего не предпринимайте.`;
         }
         await this.transport.send({id:row.id,to:row.recipient,subject,text});
         await this.db.client.mailMessage.updateMany({where:lease,data:{status:'SENT',sentAt:new Date(),payload:null,leaseToken:null,leaseUntil:null,lastErrorCode:null}});count++;

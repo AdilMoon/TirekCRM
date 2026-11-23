@@ -93,7 +93,8 @@ test('account mail is transactional, encrypted where needed and retried without 
      await tx.mailMessage.update({where:{id},data:{deliveryMode:'local'}});
     });
    }finally{for(const name of names)if(old[name]===undefined)delete process.env[name];else process.env[name]=old[name];}
-   const sent=[];assert.equal(await worker(actor,async message=>sent.push(message),'local',key).runOnce(),1);assert.ok(sent[0].text.includes(token));
+   const sent=[];assert.equal(await worker(actor,async message=>sent.push(message),'local',key).runOnce(),1);
+   assert.ok(sent[0].text.includes((process.env.WEB_ORIGIN ?? 'http://localhost:3000')+'/reset-password#token='+token));
    assert.equal((await db.mailMessage.findUniqueOrThrow({where:{id}})).payload,null);
    const staleId=randomUUID();await db.mailMessage.create({data:{id:staleId,userId:actor.id,organizationId:actor.organizationId,recipient:actor.email,kind:'PASSWORD_RESET',eventKey:randomUUID(),deliveryMode:'local',payload:encryptReset(token,staleId,actor.id,key),expiresAt:new Date(0)}});
    assert.equal(await worker(actor,async()=>{throw Error('Expired token must not be sent');},'local',key).runOnce(),0);

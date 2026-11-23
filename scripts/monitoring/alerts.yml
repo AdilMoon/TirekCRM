@@ -1,0 +1,43 @@
+groups:
+  - name: tirek
+    rules:
+      - alert: TirekApiDown
+        expr: up{job="tirek-api"} == 0
+        for: 1m
+        labels: {severity: critical}
+        annotations: {summary: "Tirek API cannot be scraped"}
+      - alert: TirekDatabaseUnavailable
+        expr: tirek_database_up == 0
+        for: 1m
+        labels: {severity: critical}
+        annotations: {summary: "Tirek database collection is failing"}
+      - alert: TirekCollectionStale
+        expr: time() - tirek_snapshot_timestamp_seconds > 60
+        for: 1m
+        labels: {severity: warning}
+        annotations: {summary: "Tirek database metrics are stale"}
+      - alert: TirekPageUnavailable
+        expr: probe_success{job="tirek-pages"} == 0
+        for: 1m
+        labels: {severity: critical}
+        annotations: {summary: "Tirek web or HTTPS readiness probe is failing"}
+      - alert: TirekApiErrors
+        expr: sum(rate(tirek_http_requests_total{status=~"5.."}[5m])) / clamp_min(sum(rate(tirek_http_requests_total[5m])), 0.001) > 0.05 and sum(increase(tirek_http_requests_total[5m])) >= 20
+        for: 2m
+        labels: {severity: warning}
+        annotations: {summary: "More than 5 percent of Tirek API responses are server errors"}
+      - alert: TirekDeliveryBacklog
+        expr: tirek_delivery_oldest_pending_seconds > 300 and on(channel) tirek_channel_enabled == 1
+        for: 2m
+        labels: {severity: warning}
+        annotations: {summary: "Tirek delivery queue has been pending for more than five minutes"}
+      - alert: TirekTelegramPollStale
+        expr: (time() - tirek_telegram_last_poll_timestamp_seconds > 90) and on() (tirek_channel_enabled{channel="telegram"} == 1)
+        for: 2m
+        labels: {severity: warning}
+        annotations: {summary: "Tirek Telegram polling is stale"}
+      - alert: TirekDeliveryFailed
+        expr: tirek_delivery_messages{status="FAILED"} > 0 and on(channel) tirek_channel_enabled == 1
+        for: 1m
+        labels: {severity: warning}
+        annotations: {summary: "Tirek delivery channel has terminal failures requiring review"}

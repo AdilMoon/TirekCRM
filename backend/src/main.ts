@@ -12,6 +12,7 @@ import { ApiErrors } from './common/api-errors.filter';
 import { webOrigin } from './common/web-origin';
 import { passwordResetDeliveryMode } from './auth/password-reset-delivery';
 import { mailConfig } from './modules/mail/mail-config';
+import {MetricsService} from './modules/monitoring/metrics.service';
 async function bootstrap() {
   webOrigin(); // Fail at startup instead of issuing cookies with invalid configuration.
   passwordResetDeliveryMode();
@@ -30,6 +31,15 @@ async function bootstrap() {
     max: 300, timeWindow: '1 minute',
     // Nest's exception filter must preserve the plugin's rejection status and Retry-After headers.
     errorResponseBuilder: (_request, context) => new HttpException('Слишком много запросов. Попробуйте позже.', context.statusCode),
+  });
+  const metrics=app.get(MetricsService);
+  const started=new WeakMap<FastifyRequest,number>();
+  app.getHttpAdapter().getInstance().addHook('onRequest',async (request:FastifyRequest)=>{
+    if(metrics.enabled)started.set(request,performance.now());
+  });
+  app.getHttpAdapter().getInstance().addHook('onResponse',async (request:FastifyRequest,reply:FastifyReply)=>{
+    const start=started.get(request);
+    if(start!==undefined)metrics.observe(request.method,request.routeOptions.url,reply.statusCode,(performance.now()-start)/1000);
   });
   app.setGlobalPrefix('api');
   app.useGlobalFilters(new ApiErrors());

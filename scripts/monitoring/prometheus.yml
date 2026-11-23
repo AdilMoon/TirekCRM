@@ -1,0 +1,29 @@
+global:
+  scrape_interval: 15s
+  scrape_timeout: 5s
+  evaluation_interval: 15s
+rule_files:
+  - /etc/prometheus/alerts.yml
+scrape_configs:
+  - job_name: tirek-api
+    metrics_path: /api/ops/metrics
+    authorization:
+      credentials_file: /run/secrets/metrics_token
+    static_configs:
+      - targets: [api:4000]
+  - job_name: tirek-pages
+    metrics_path: /probe
+    params:
+      module: [tirek_http]
+    static_configs:
+      - targets: [http://web:3000/]
+        labels: {component: web}
+      - targets: [https://caddy/api/health]
+        labels: {component: https}
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [component]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox:9115

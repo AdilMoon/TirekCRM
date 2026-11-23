@@ -16,6 +16,9 @@
 https://localhost {
 	tls internal
 	header -Strict-Transport-Security
+	handle /api/ops/* {
+		respond 404
+	}
 	handle /api/* {
 		reverse_proxy api:4000
 	}

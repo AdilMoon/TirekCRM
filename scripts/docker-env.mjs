@@ -23,3 +23,4 @@ try {
   if (error.code !== 'EEXIST') throw error;
   console.log('Using existing .local/docker.env.');
 }
+await import('./monitoring-setup.mjs');

@@ -52,7 +52,9 @@ services:
       MAIL_ENCRYPTION_KEY: ${TIREK_DOCKER_MAIL_ENCRYPTION_KEY:-}
       TELEGRAM_DELIVERY: ${TIREK_DOCKER_TELEGRAM_DELIVERY:-disabled}
       TELEGRAM_BOT_TOKEN: ${TIREK_DOCKER_TELEGRAM_BOT_TOKEN:-}
-    networks: [default, database]
+      METRICS_TOKEN_FILE: /run/secrets/metrics_token
+    secrets: [metrics_token]
+    networks: [default, database, monitoring]
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -76,6 +78,79 @@ services:
       timeout: 5s
       retries: 12
 
+  prometheus:
+    image: prom/prometheus:v3.16.0
+    profiles: [monitoring]
+    restart: unless-stopped
+    mem_limit: 512m
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=7d
+      - --storage.tsdb.retention.size=512MB
+    ports: ["127.0.0.1:9090:9090"]
+    volumes:
+      - ./scripts/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./scripts/monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus_data:/prometheus
+    secrets: [metrics_token]
+    networks: [monitoring, monitoring_access]
+    depends_on:
+      blackbox: {condition: service_started}
+
+  grafana:
+    image: grafana/grafana:13.3.1
+    profiles: [monitoring]
+    restart: unless-stopped
+    mem_limit: 512m
+    ports: ["127.0.0.1:3100:3000"]
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SERVER_ROOT_URL: http://localhost:3100/
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana_password
+      GF_SECURITY_SECRET_KEY__FILE: /run/secrets/grafana_secret_key
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
+    secrets: [grafana_password, grafana_secret_key]
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./scripts/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./scripts/monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    networks: [monitoring, monitoring_access]
+    depends_on: [prometheus]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+
+  blackbox:
+    image: prom/blackbox-exporter:v0.29.1
+    profiles: [monitoring]
+    restart: unless-stopped
+    mem_limit: 96m
+    command: ["--config.file=/etc/blackbox/config.yml"]
+    volumes:
+      - ./scripts/monitoring/blackbox.yml:/etc/blackbox/config.yml:ro
+      - caddy_public_ca:/trust:ro
+    networks: [default, monitoring]
+    depends_on:
+      ca-export: {condition: service_completed_successfully}
+
+  ca-export:
+    image: caddy:2-alpine
+    profiles: [monitoring]
+    network_mode: none
+    entrypoint: ["/bin/sh", "/export-ca.sh"]
+    volumes:
+      - caddy_data:/source:ro
+      - caddy_public_ca:/trust
+      - ./scripts/monitoring/export-ca.sh:/export-ca.sh:ro
+    depends_on: [caddy]
+
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
@@ -91,9 +166,23 @@ services:
         condition: service_healthy
 
 networks:
+  monitoring_access:
+  monitoring:
+    internal: true
   database:
     internal: true
 
 volumes:
+  caddy_public_ca:
+  prometheus_data:
+  grafana_data:
   postgres_data:
   caddy_data:
+
+secrets:
+  metrics_token:
+    file: ./.local/monitoring/metrics-token
+  grafana_password:
+    file: ./.local/monitoring/grafana-password
+  grafana_secret_key:
+    file: ./.local/monitoring/grafana-secret-key

@@ -1,0 +1,11 @@
+modules:
+  tirek_http:
+    prober: http
+    timeout: 4s
+    http:
+      method: GET
+      headers:
+        Host: localhost
+      tls_config:
+        server_name: localhost
+        ca_file: /trust/root.crt

@@ -1,0 +1,42 @@
+rule_files:
+  - /etc/prometheus/alerts.yml
+evaluation_interval: 15s
+tests:
+  - interval: 15s
+    input_series:
+      - series: 'up{job="tirek-api",instance="api:4000"}'
+        values: '1x5 0x10 1x10'
+      - series: 'tirek_database_up{job="tirek-api",instance="api:4000"}'
+        values: '1x5 0x10 1x10'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: TirekApiDown
+        exp_alerts:
+          - exp_labels: {job: tirek-api, instance: "api:4000", severity: critical}
+            exp_annotations: {summary: "Tirek API cannot be scraped"}
+      - eval_time: 3m
+        alertname: TirekDatabaseUnavailable
+        exp_alerts:
+          - exp_labels: {job: tirek-api, instance: "api:4000", severity: critical}
+            exp_annotations: {summary: "Tirek database collection is failing"}
+      - eval_time: 6m
+        alertname: TirekApiDown
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: TirekDatabaseUnavailable
+        exp_alerts: []
+  - interval: 15s
+    input_series:
+      - series: 'tirek_delivery_oldest_pending_seconds{channel="mail",job="tirek-api",instance="api:4000"}'
+        values: '600x30'
+      - series: 'tirek_channel_enabled{channel="mail",job="tirek-api",instance="api:4000"}'
+        values: '1x20 0x10'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: TirekDeliveryBacklog
+        exp_alerts:
+          - exp_labels: {channel: mail, job: tirek-api, instance: "api:4000", severity: warning}
+            exp_annotations: {summary: "Tirek delivery queue has been pending for more than five minutes"}
+      - eval_time: 6m
+        alertname: TirekDeliveryBacklog
+        exp_alerts: []

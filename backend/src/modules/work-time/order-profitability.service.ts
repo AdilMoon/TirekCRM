@@ -1,6 +1,6 @@
 import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import type { OrderCostColumn, OrderProfitability, OrderProfitabilityInput } from '@tirek/contracts';
+import type { OrderProfitability, OrderProfitabilityInput } from '@tirek/contracts';
 import type { AuthRequest } from '../../auth/session.guard';
 import { cents, money } from '../../common/money';
 import { serializable } from '../../common/transaction';
@@ -8,33 +8,10 @@ import { Database } from '../../database/database.service';
 import { AuditService } from '../audit/audit.service';
 import { orderTimeContributors } from './order-time-totals';
 
+import {select,amounts} from './profitability-calculation';
+import {readProfitabilities} from './profitability-reader';
 type Actor = AuthRequest['user'];
-const select = {
-  id: true, number: true, title: true, repeatOfId: true, costVersion: true, total: true, status: true, plannedMinutes: true,
-  plannedHourlyRate: true, plannedDirectExpenses: true, actualHourlyRate: true,
-} as const;
-type OrderInputs = Prisma.OrderGetPayload<{ select: typeof select }>;
-const amounts = (order: OrderInputs) => ({
-  plannedHourlyRate: order.plannedHourlyRate?.toFixed(2) ?? null,
-  plannedDirectExpenses: order.plannedDirectExpenses?.toFixed(2) ?? null,
-  actualHourlyRate: order.actualHourlyRate?.toFixed(2) ?? null,
-});
-const normalize = (value: string | null) => value === null ? null : money(cents(value));
-const asMoney = (value: bigint | null) => value === null ? null : money(value);
-
-function roundedDivide(numerator: bigint, denominator: bigint): bigint {
-  if (numerator < 0n) return -roundedDivide(-numerator, denominator);
-  return (numerator + denominator / 2n) / denominator;
-}
-
-function costColumn(revenue: bigint, labor: bigint | null, expenses: bigint | null, rework: bigint | null = 0n): OrderCostColumn {
-  const cost = labor === null || expenses === null || rework === null ? null : labor + expenses + rework;
-  const profit = cost === null ? null : revenue - cost;
-  return {
-    rework: asMoney(rework), labor: asMoney(labor), expenses: asMoney(expenses), cost: asMoney(cost), profit: asMoney(profit),
-    marginPercent: revenue > 0n && profit !== null ? money(roundedDivide(profit * 10000n, revenue)) : null,
-  };
-}
+const normalize=(value:string|null)=>value===null?null:money(cents(value));
 
 @Injectable()
 export class OrderProfitabilityService {
@@ -47,89 +24,11 @@ export class OrderProfitabilityService {
   }
 
   detail(actor: Actor, id: string): Promise<OrderProfitability> {
-    return this.db.client.$transaction(tx => this.calculate(tx,actor,id), {isolationLevel:Prisma.TransactionIsolationLevel.RepeatableRead});
-  }
-
-  private async calculate(tx:Prisma.TransactionClient,actor:Actor,id:string):Promise<OrderProfitability> {
-    const organizationId = actor.organizationId;
-      const order = await this.order(tx, actor, id);
-      const time = await orderTimeContributors(tx, organizationId, id);
-      const rates = await tx.orderLaborRate.findMany({
-        where: { orderId: id, organizationId }, select: { employeeId: true, hourlyRate: true },
-      });
-      // A replacement is a new expense. Its old expense is offset on its original order.
-      const [expense] = await tx.$queryRaw<{ cents: string }[]>(Prisma.sql`
-        SELECT COALESCE(SUM(((e.amount - COALESCE(r.amount, 0)) * 100)::bigint), 0)::text AS cents
-        FROM "Expense" e LEFT JOIN "ExpenseReversal" r
-          ON r."expenseId" = e.id AND r."organizationId" = e."organizationId"
-        WHERE e."orderId" = ${id}::uuid AND e."organizationId" = ${organizationId}::uuid`);
-
-      const visits=order.repeatOfId ? [] : await tx.order.findMany({where:{organizationId,repeatOfId:id},
-        select:{id:true,notes:true,status:true},orderBy:[{createdAt:'asc'},{id:'asc'}]});
-      const visitCosts=await Promise.all(visits.map(visit=>this.calculate(tx,actor,visit.id)));
-      const sumCosts=(values:(string|null)[])=>values.some(value=>value===null) ? null :
-        values.reduce<bigint>((sum,value)=>sum+cents(value!),0n);
-      const actualRework=sumCosts(visitCosts.map(visit=>visit.actual.cost));
-      const forecastRework=sumCosts(visitCosts.map(visit=>visit.forecast.atCompletion.cost));
-      const budget = amounts(order);
-      const byEmployee = new Map(rates.map(rate => [rate.employeeId, rate.hourlyRate.toFixed(2)]));
-      const contributors = time.filter(row => row.actualMinutes > 0n).map(row => ({
-        employeeId: row.employeeId, name: row.name, minutes: row.actualMinutes,
-        hourlyRate: byEmployee.get(row.employeeId) ?? null,
-      }));
-      const pendingMinutes = time.reduce((total, row) => total + row.pendingMinutes, 0n);
-      const actualMinutes = contributors.reduce((total, row) => total + row.minutes, 0n);
-      let actualLabor: bigint | null = 0n;
-      for (const row of contributors) {
-        const rate = row.hourlyRate ?? budget.actualHourlyRate;
-        if (rate === null) {
-          actualLabor = null;
-          break;
-        }
-        actualLabor += row.minutes * cents(rate);
-      }
-      const plannedRate = budget.plannedHourlyRate === null ? null : cents(budget.plannedHourlyRate);
-      const plannedLabor = plannedRate === 0n ? 0n : plannedRate === null || order.plannedMinutes === null
-        ? null : roundedDivide(plannedRate * BigInt(order.plannedMinutes), 60n);
-      const revenue = cents(order.total.toFixed(2));
-      const actualRevenue = order.status === 'CANCELLED' ? 0n : revenue;
-      const closed = order.status === 'COMPLETED' || order.status === 'CANCELLED';
-      const remainingRate = budget.actualHourlyRate ?? budget.plannedHourlyRate;
-      const remainingMinutes = closed ? 0 : order.plannedMinutes === null ? null :
-        Math.max(0, order.plannedMinutes - Number(actualMinutes + pendingMinutes));
-      const material = await tx.materialMovement.aggregate({where:{organizationId,orderId:id},_sum:{costCents:true}});
-      const incurredExpenses = BigInt(expense.cents) + (material._sum.costCents ?? 0n);
-      const expenseBudget = budget.plannedDirectExpenses === null ? null : cents(budget.plannedDirectExpenses);
-      const remainingExpenses = closed ? 0n : expenseBudget === null ? null :
-        expenseBudget > incurredExpenses ? expenseBudget - incurredExpenses : 0n;
-
-      // Accumulate minute × rate for all stages before rounding once to the nearest tiyn.
-      let forecastLabor = actualLabor;
-      for (const row of time) {
-        if (row.pendingMinutes === 0n || forecastLabor === null) continue;
-        const rate = byEmployee.get(row.employeeId) ?? remainingRate;
-        forecastLabor = rate === null ? null : forecastLabor + row.pendingMinutes * cents(rate);
-      }
-      if (forecastLabor !== null && remainingMinutes !== 0 && remainingRate !== '0.00') {
-        forecastLabor = remainingMinutes === null || remainingRate === null ? null :
-          forecastLabor + BigInt(remainingMinutes) * cents(remainingRate);
-      }
-      return {
-        repeatOfId:order.repeatOfId,status:order.status,
-        repeatVisits:visitCosts.map((visit,index)=>({id:visit.id,number:visit.number,title:visit.title,status:visits[index].status,
-          reason:visits[index].notes,actualCost:visit.actual.cost,forecastCost:visit.forecast.atCompletion.cost})),
-        id, number: order.number, title: order.title, costVersion: order.costVersion, revenue: money(revenue),
-        actualRevenue: money(actualRevenue),
-        plannedMinutes: order.plannedMinutes, actualMinutes: Number(actualMinutes), pendingMinutes: Number(pendingMinutes), ...budget,
-        planned: costColumn(revenue, plannedLabor, expenseBudget),
-        actual: costColumn(actualRevenue, actualLabor === null ? null : roundedDivide(actualLabor, 60n), incurredExpenses,actualRework),
-        forecast: {
-          atCompletion: costColumn(actualRevenue, forecastLabor === null ? null : roundedDivide(forecastLabor, 60n),
-            remainingExpenses === null ? null : incurredExpenses + remainingExpenses,forecastRework),
-          remainingMinutes, remainingHourlyRate: remainingRate, remainingExpenses: asMoney(remainingExpenses), closed:closed&&visitCosts.every(visit=>visit.forecast.closed),
-        },
-        contributors: contributors.map(({ minutes, ...row }) => ({ ...row, approvedMinutes: Number(minutes) })),
-      };
+    return this.db.client.$transaction(async tx=>{
+      const result=(await readProfitabilities(tx,actor.organizationId,[id])).get(id);
+      if(!result)throw new NotFoundException('Заказ не найден');
+      return result;
+    },{isolationLevel:Prisma.TransactionIsolationLevel.RepeatableRead});
   }
 
   save(actor: Actor, id: string, input: OrderProfitabilityInput) {

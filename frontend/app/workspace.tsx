@@ -48,6 +48,7 @@ const navigation = [
   const [data, setData] = useState(emptyData);
   const [section, setSection] = useState<Section>('overview');
   const [modal, setModal] = useState<Modal | null>(null);
+  const [attentionRequested,setAttentionRequested]=useState(false);
   const [messageOpen,setMessageOpen]=useState(false);
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
@@ -74,7 +75,8 @@ const navigation = [
     finally { setBoot(false); }
   })(); }, []);
   useEffect(() => { if (!toast) return; const timeout = setTimeout(() => setToast(''), 4500); return () => clearTimeout(timeout); }, [toast]);
-  function navigate(next: Section) {
+  function navigate(next: Section, attention = false) {
+    setAttentionRequested(attention);
     setSection(next);
     if (managementSections.includes(next)) setManagementOpen(true);
     setMobileMenu(false);
@@ -133,11 +135,11 @@ const navigation = [
           <Stat label={t("Осталось получить")} value={formatMoney(dashboard.outstanding)} icon={<Clock3 size={19} />} detail={t("По действующим и выполненным заказам")} />
         </div>
         <div className="dashboard-middle"><section className="panel chart-panel"><div className="panel-heading"><div><h2>{t("Движение денег")}</h2><p>{t("Как меняются поступления и расходы")}</p></div><span className="subtle-pill">{t("6 месяцев")}</span></div><MoneyChart data={dashboard.monthly} /><div className="chart-legend"><span><i className="income-dot" />{t("Поступления")}</span><span><i className="expense-dot" />{t("Расходы")}</span><small>{t("По датам операций · Алматы")}</small></div></section>
-        <section className="panel attention-panel"><div className="panel-heading"><div><h2>{t("Требует внимания")} <span className="count-pill">{dashboard.attention.length}</span></h2><p>{t("Ближайшие шаги по заказам")}</p></div></div><div className="attention-list">{dashboard.attention.length ? dashboard.attention.slice(0,4).map((item, i) => <button key={item.id} className="attention-item" onClick={async () => { try { setModal({kind:'details',order:await api<Order>('/orders/'+item.id)}); } catch(e){setError((e as Error).message);} }}><span className={`attention-icon a${i}`}><Clock3 size={17} /></span><span><strong>{item.title}</strong><small>{t(item.reason)}</small></span><ChevronRight size={17} /></button>) : <Empty>{t("Все текущие заказы завершены")}</Empty>}</div><div className="attention-foot"><CheckCircle2 size={16} />{t("Подсказки по срокам и статусам")}</div></section></div>
+        <section className="panel attention-panel"><div className="panel-heading"><div><h2>{t("Сроки и статусы")} <span className="count-pill">{dashboard.attention.length}</span></h2><p>{t("Ближайшие шаги по заказам")}</p></div></div><div className="attention-list">{dashboard.attention.length ? dashboard.attention.slice(0,4).map((item, i) => <button key={item.id} className="attention-item" onClick={async () => { try { setModal({kind:'details',order:await api<Order>('/orders/'+item.id)}); } catch(e){setError((e as Error).message);} }}><span className={`attention-icon a${i}`}><Clock3 size={17} /></span><span><strong>{item.title}</strong><small>{t(item.reason)}</small></span><ChevronRight size={17} /></button>) : <Empty>{t("Все текущие заказы завершены")}</Empty>}</div><button type="button" className="attention-foot text-button" onClick={()=>navigate("orders",true)}><CheckCircle2 size={16} />{t("Все причины по заказам")}</button></section></div>
         <section className="panel"><div className="panel-heading"><div><h2>{t("Последние заказы")}</h2><p>{t("Каждое обращение на своём месте")}</p></div><button className="text-button" onClick={() => navigate('orders')}>{t("Все заказы")} <ArrowRight size={16} /></button></div><OrdersTable orders={data.orders.slice(0,5)} onSelect={openOrder} /></section>
         <div className="bottom-summary"><span><Users size={16} /><strong>{dashboard.clientsCount}</strong>  {t("клиентов в базе")}</span><span><BriefcaseBusiness size={16} /><strong>{dashboard.activeOrders}</strong>  {t("заказов в работе")}</span><span><FileText size={16} /><strong>{dashboard.documentsCount}</strong>  {t("документов в базе")}</span></div>
       </>}
-      {section === 'orders' && <OrderDirectory revision={data} onSelect={openOrder}/>}
+      {section === 'orders' && <OrderDirectory key={String(attentionRequested)} revision={data} onSelect={openOrder} initialAttention={attentionRequested}/>}
       {section === 'clients' && <ClientDirectory revision={data} onSelect={client=>setModal({kind:'client',client})}/>}
       {section === 'tasks' && <Tasks user={user}/>}
       {section === 'team' && <Team/>}

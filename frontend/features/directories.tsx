@@ -8,6 +8,7 @@ import { usePage } from '../lib/use-page';
 import { SearchBox, Empty } from '../components/ui';
 import { Pagination } from '../components/pagination';
 import { OrdersTable } from './orders-table';
+import {OrderAttentionBoard} from './order-attention';
 import { OrderEffortReport } from './order-effort';
 export function ClientDirectory({revision,onSelect}:{revision:unknown;onSelect:(client:Client)=>void}) {
  const {t,dateLabel}=useI18n();
@@ -24,18 +25,24 @@ export function ClientDirectory({revision,onSelect}:{revision:unknown;onSelect:(
   <Pagination result={result} page={page} setPage={setPage} busy={busy}/>
  </section>;
 }
-export function OrderDirectory({revision,onSelect}:{revision:unknown;onSelect:(order:Order)=>void}) {
+export function OrderDirectory({revision,onSelect,initialAttention=false}:{revision:unknown;onSelect:(order:Pick<Order,'id'>)=>void;initialAttention?:boolean}) {
  const {t}=useI18n();
+ const [attention,setAttention]=useState(initialAttention);
  const [showEffort,setShowEffort]=useState(false);
  const [q,setQ]=useState(''),[page,setPage]=useState(1),[status,setStatus]=useState('');
  const {result,error,busy,retry}=usePage<Order>('/orders/search',new URLSearchParams({q,page:String(page),...(status?{status}:{})}).toString(),revision);
- return <section className="panel" aria-busy={busy}><div className="table-toolbar">
+ return <section className="panel" aria-busy={busy}>
+  <div className="order-view-tabs" role="group" aria-label={t('Представление заказов')}>
+    <button type="button" className={'button '+(attention?'secondary':'primary')} aria-pressed={!attention} onClick={()=>setAttention(false)}>{t('Все заказы')}</button>
+    <button type="button" className={'button '+(attention?'primary':'secondary')} aria-pressed={attention} onClick={()=>setAttention(true)}>{t('Требуют внимания')}</button>
+  </div>
+  {attention?<OrderAttentionBoard revision={revision} onSelect={onSelect}/>:<><div className="table-toolbar">
   <label className="filter-label">{t('Статус')}<select value={status} onChange={e=>{setStatus(e.target.value);setPage(1);}}><option value="">{t('Все заказы')}</option>{stages.map(s=><option key={s} value={s}>{t(stageLabels[s])}</option>)}</select></label>
   <SearchBox value={q} setValue={value=>{setQ(value);setPage(1);}} placeholder={t('Название, номер или клиент')}/>
   <button type="button" className="button secondary" onClick={()=>setShowEffort(true)}><Clock3 size={16} aria-hidden="true"/>{t('Отчёт по времени заказов')}</button></div>
   {error&&<div className="alert" role="alert">{t(error)}<button onClick={retry}>{t('Обновить')}</button></div>}
   {busy?<div className="empty">{t('Загрузка…')}</div>:<OrdersTable orders={result?.items??[]} onSelect={onSelect}/>}
   <Pagination result={result} page={page} setPage={setPage} busy={busy}/>
-  {showEffort && <OrderEffortReport close={()=>setShowEffort(false)}/>}
+  {showEffort && <OrderEffortReport close={()=>setShowEffort(false)}/>}</>}
  </section>;
 }

@@ -8,10 +8,12 @@ import { OrderProfitabilityController } from './order-profitability.controller';
 import { OrderProfitabilityService } from './order-profitability.service';
 import { WorkTimeController } from './work-time.controller';
 import { WorkTimeService } from './work-time.service';
+import {OrderAttentionService} from './order-attention.service';
+import {OrderAttentionController} from './order-attention.controller';
 
 @Module({
   imports: [DatabaseModule, AuthModule, AuditWriterModule],
-  controllers: [WorkTimeController, OrderEffortController, OrderProfitabilityController],
-  providers: [WorkTimeService, OrderEffortService, OrderProfitabilityService],
+  controllers: [WorkTimeController, OrderEffortController, OrderProfitabilityController,OrderAttentionController],
+  providers: [WorkTimeService, OrderEffortService, OrderProfitabilityService,OrderAttentionService],
 })
 export class WorkTimeModule {}

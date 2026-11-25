@@ -18,7 +18,8 @@ import { WorkTime } from '../features/work-time';
 import { EmployeeWorkspace } from '../features/employee-workspace';
 import { Login } from '../features/login';
 import { OrdersTable } from '../features/orders-table';
-import { FinanceReport, DocumentDirectory } from '../features/reports';
+import { DocumentDirectory } from '../features/reports';
+import {FinanceWorkspace} from '../features/payment-control';
 import { MoneyChart } from '../features/money-chart';
 import { ClientDirectory, OrderDirectory } from '../features/directories';
 import { AuditTrail } from '../features/audit-trail';
@@ -143,7 +144,7 @@ const navigation = [
       {section === 'history' && <AuditTrail revision={data}/>}
       {section === 'finances' && <button className="button secondary finance-documents-shortcut" onClick={()=>navigate('documents')}>{t('Счета и акты')}</button>}
       {section === 'documents' && <button className="text-button finance-documents-shortcut" onClick={()=>navigate('finances')}>{t('К финансам')}</button>}
-      {section === 'finances' && <FinanceReport revision={data} onChanged={()=>{refresh().catch(e=>setError(e.message));}} onOrder={id=>openOrder({id})}/>}
+      {section === 'finances' && <FinanceWorkspace revision={data} onChanged={()=>{refresh().catch(e=>setError(e.message));}} onOrder={id=>openOrder({id})}/>}
       {section === 'documents' && <DocumentDirectory revision={data}/>}
       {section === 'settings' && <WorkspaceSettings onSaved={async()=>{setUser(await api<SessionUser>('/auth/me'));setToast(t('Реквизиты сохранены'));}} onSessionEnded={expired=>{setUser(null);setData(emptyData);setError(expired?'Сессия истекла. Войдите снова':'');}}/>}
 <footer className="page-footer"><span>{t("Tirek · опора вашего бизнеса")}</span><span>{refreshing ? t("Обновляем данные…") : t("Данные вашего рабочего пространства")}</span></footer>

@@ -79,6 +79,7 @@
 .amount.refund { color:#a03332; }
 .amount.expense_reversal { color:var(--green); }
 .report-controls .tabs { flex-wrap:wrap; }
+.payment-control-info>.report-scope{margin:0 24px 14px;line-height:1.5}
 @media(max-width:760px) { .financial-operation { padding:16px; } }
 .report-export-bar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
 .owner-navigation { margin-top: 18px; }

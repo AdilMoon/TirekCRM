@@ -188,6 +188,16 @@ export type MovementQuery=z.infer<typeof movementQuerySchema>;
 export type DocumentQuery=z.infer<typeof documentQuerySchema>;
 export interface MovementPage extends PageResult<Movement> {summary:{received:string;expenses:string;cashFlow:string}}
 
+export const paymentControlQuerySchema=listQuerySchema.extend({state:z.enum(['OVERDUE','SCHEDULED','NO_DUE']).optional()}).strict();
+export type PaymentControlQuery=z.infer<typeof paymentControlQuerySchema>;
+export interface PaymentControlRow {
+ id:string;number:number;title:string;clientName:string;total:string;paid:string;balance:string;
+ dueDate:string|null;invoiceId:string|null;invoiceNumber:number|null;state:'OVERDUE'|'SCHEDULED'|'NO_DUE';
+}
+export interface PaymentControlPage extends PageResult<PaymentControlRow> {
+ today:string;summary:{balance:string;overdue:string;scheduled:string;noDue:string};
+}
+
 export const passwordChangeSchema=z.object({
  currentPassword:z.string().min(1).max(128),newPassword:z.string().min(12).max(128),
 }).strict();

@@ -4,10 +4,15 @@ import type { FastifyReply } from 'fastify';
 import { movementQuerySchema,movementExportQuerySchema,documentQuerySchema } from '@tirek/contracts';
 import { AuthRequest,SessionGuard } from '../../auth/session.guard';
 import { ReportsService } from './reports.service';
+import {PaymentControlService} from './payment-control.service';
+import {paymentControlQuerySchema} from '@tirek/contracts';
 @Controller()
 @UseGuards(SessionGuard)
 export class ReportsController {
- constructor(private readonly reports:ReportsService){}
+ constructor(private readonly reports:ReportsService,private readonly payments:PaymentControlService){}
+ @Get('payments/control')
+ @RouteConfig({rateLimit:{max:60,timeWindow:'1 minute'}})
+ paymentControl(@Req() req:AuthRequest,@Query() query:unknown){return this.payments.list(req.user.organizationId,paymentControlQuerySchema.parse(query));}
  @Get('movements/search') movements(@Req() req:AuthRequest,@Query() query:unknown){return this.reports.movements(req.user.organizationId,movementQuerySchema.parse(query));}
  @Get('movements/export')
  @RouteConfig({rateLimit:{max:10,timeWindow:'1 minute'}})

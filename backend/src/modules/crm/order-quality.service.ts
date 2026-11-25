@@ -57,7 +57,7 @@ export class OrderQualityService {
       const org=await tx.organization.update({where:{id:actor.organizationId},data:{orderSeq:{increment:1}}});
       const visit=await tx.order.create({data:{organizationId:actor.organizationId,clientId:original.clientId,
         repeatOfId:id,repeatKey:input.idempotencyKey,repeatRequestHash:fingerprint,number:org.orderSeq,title:'Повторный выезд · № '+original.number,
-        total:'0.00',notes:input.reason,
+        total:'0.00',notes:input.reason,serviceObjectId:original.serviceObjectId,
         actualHourlyRate:original.actualHourlyRate}});
       const acceptance=await acceptanceState(tx,id);
       if(acceptance.items.length) await tx.orderAcceptance.create({data:{orderId:visit.id,organizationId:actor.organizationId,

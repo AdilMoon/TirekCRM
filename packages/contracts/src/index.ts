@@ -1,9 +1,12 @@
 import { z } from 'zod';
+import {moneySchema} from './money';
+export {moneySchema} from './money';
 export * from './work-time';
 export * from './order-quotes';
 export * from './order-profitability';
 export * from './acceptance';
 export * from './order-attention';
+export * from './service-objects';
 
 export const stages = ['NEW', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'] as const;
 export type Stage = typeof stages[number];
@@ -11,8 +14,6 @@ export const stageLabels: Record<Stage, string> = {
   NEW: 'Новый', CONFIRMED: 'Согласован', IN_PROGRESS: 'В работе',
   COMPLETED: 'Выполнен', CANCELLED: 'Отменён',
 };
-export const moneySchema = z.string().regex(/^(0|[1-9]\d{0,11})(\.\d{1,2})?$/, 'Введите сумму с точностью до тиына')
-  .refine(value => /[1-9]/.test(value), 'Сумма должна быть больше нуля');
 const text = (max: number) => z.string().trim().min(1, 'Обязательное поле').max(max);
 const optionalText = (max:number) => z.string().trim().max(max).refine(value=>!(/[\u0000-\u001f\u007f]/.test(value)), 'Недопустимые символы в реквизитах').default('');
 export const businessIdSchema = z.string().trim().regex(/^(\d{12})?$/, 'ИИН/БИН должен содержать 12 цифр').default('');
@@ -322,6 +323,7 @@ export const passportPhotoVisibilitySchema=z.object({
 export type PassportPhotoVisibilityInput=z.infer<typeof passportPhotoVisibilitySchema>;
 export interface PassportPhoto {id:string;phase:'BEFORE'|'AFTER';shared:boolean;image:string;canDelete?:boolean}
 export interface OrderPassport {
+ canRequestService?:boolean;
  companyName:string;number:number;title:string;status:Stage;dueDate:string|null;
  orderVersion:number;revision:number;expiresAt:string|null;active:boolean;confirmedAt:string|null;
  photos:PassportPhoto[];

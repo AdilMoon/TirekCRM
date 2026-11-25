@@ -54,7 +54,7 @@ test('attention batches a full workload and reconciles exact costs, scope, filte
     assert.ok(queries<35,'Workload should use batch reads');
     assert.equal(all.summary.orders,28);
     assert.equal(all.summary.forecastLoss,'99999999999999999.90');
-    assert.deepEqual(all.summary.reasons,{LOSS:2,INCOMPLETE:3,RECEIPTS:25,APPROVAL:1,OVERRUN:1,TIME_REVIEW:1,DEADLINE:1});
+    assert.deepEqual(all.summary.reasons,{LOSS:2,INCOMPLETE:3,RECEIPTS:25,APPROVAL:1,OVERRUN:1,TIME_REVIEW:1,DEADLINE:1,SERVICE_REQUEST:0});
     assert.equal(all.total,28);assert.equal(all.items.length,20);
     assert.equal(all.items[0].id,ids[31]);assert.equal(all.items[1].id,ids[0]);
     const receipts=await service.list(owner,{q:'',page:2,reason:'RECEIPTS'});

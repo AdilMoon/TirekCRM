@@ -8,10 +8,11 @@ import {Empty,SearchBox,Status} from '../components/ui';
 import {OrderProfitabilityPanel} from './order-profitability';
 import {OrderEffort} from './order-effort';
 import {OrderQuoteManager} from './order-quote-manager';
+import {ServiceObjectPanel} from './service-object';
 
 const labels={
   LOSS:'Прогноз убытка',INCOMPLETE:'Не хватает данных для расчёта',RECEIPTS:'Чеки на проверке',
-  APPROVAL:'Срок согласования истёк',OVERRUN:'Перерасход времени',TIME_REVIEW:'Часы на проверке',DEADLINE:'Срок заказа прошёл',
+  APPROVAL:'Срок согласования истёк',OVERRUN:'Перерасход времени',TIME_REVIEW:'Часы на проверке',DEADLINE:'Срок заказа прошёл',SERVICE_REQUEST:'Повторное обращение клиента',
 } as const;
 export function OrderAttentionBoard({revision,onSelect}:{revision:unknown;onSelect:(order:{id:string})=>void}) {
   const {t,formatMoney,formatDate}=useI18n();
@@ -63,5 +64,6 @@ export function OrderAttentionBoard({revision,onSelect}:{revision:unknown;onSele
     {action?.target==='profitability'&&<OrderProfitabilityPanel key={action.orderId} id={action.orderId} close={close}/>}
     {action?.target==='effort'&&<OrderEffort key={action.orderId} id={action.orderId} close={close}/>}
     {action?.target==='quotes'&&<OrderQuoteManager key={action.orderId} id={action.orderId} close={close}/>}
+    {action?.target==='service-object'&&<ServiceObjectPanel key={action.orderId} id={action.orderId} close={close} onSelect={id=>{close();onSelect({id});}}/>}
   </section>;
 }

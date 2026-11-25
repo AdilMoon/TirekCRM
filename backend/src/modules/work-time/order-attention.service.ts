@@ -23,11 +23,12 @@ export class OrderAttentionService {
       const number=/^\d+$/.test(query.q)?Number(query.q):NaN;
       const numbered=Number.isSafeInteger(number)&&number<=2147483647?{number}:undefined;
       const pending={expenseReceipts:{some:{status:'PENDING' as const}}};
+      const pendingService={serviceRequests:{some:{status:'NEW' as const}}};
       const pendingTime={workTimeAllocations:{some:{entry:{status:'SUBMITTED' as const,kind:{not:'ABSENCE' as const}}}}};
       const unpricedTime={actualHourlyRate:null,workTimeAllocations:{some:{entry:{status:'APPROVED' as const,kind:{not:'ABSENCE' as const}}}}};
       const where:Prisma.OrderWhereInput={organizationId,repeatOfId:null,AND:[
-        {OR:[{status:{in:[...active]}},pending,pendingTime,unpricedTime,
-          {repeatVisits:{some:{OR:[{status:{in:[...active]}},pending,pendingTime,unpricedTime]}}}]},
+        {OR:[{status:{in:[...active]}},pending,pendingTime,unpricedTime,pendingService,
+          {repeatVisits:{some:{OR:[{status:{in:[...active]}},pending,pendingTime,unpricedTime,pendingService]}}}]},
         ...(query.q?[{OR:[{title:{contains:query.q,mode:'insensitive' as const}},{client:{name:{contains:query.q,mode:'insensitive' as const}}},
           {client:{company:{contains:query.q,mode:'insensitive' as const}}},
           ...(numbered?[numbered,{repeatVisits:{some:numbered}}]:[])]}]:[]),
@@ -45,6 +46,8 @@ export class OrderAttentionService {
         const quotes=await tx.orderQuote.groupBy({by:['orderId'],where:{organizationId,orderId:{in:ids},
           acceptedAt:null,revokedAt:null,expiresAt:{lte:now},order:{status:{in:[...active]}}},_count:{_all:true}});
         const receiptCounts=new Map(receipts.map(row=>[row.orderId,row._count._all]));
+        const requests=await tx.serviceRequest.groupBy({by:['sourceOrderId'],where:{organizationId,sourceOrderId:{in:ids},status:'NEW'},_count:{_all:true}});
+        const requestCounts=new Map(requests.map(row=>[row.sourceOrderId,row._count._all]));
         const quoteCounts=new Map(quotes.map(row=>[row.orderId,row._count._all]));
         for(const root of roots) {
           const detail=profit.get(root.id)!;
@@ -58,6 +61,8 @@ export class OrderAttentionService {
             if(cost.forecast.atCompletion.labor===null||cost.forecast.remainingExpenses===null)add('INCOMPLETE','profitability');
             const receiptCount=receiptCounts.get(source.id)??0;
             if(receiptCount)add('RECEIPTS','profitability',receiptCount);
+            const requestCount=requestCounts.get(source.id)??0;
+            if(requestCount)add('SERVICE_REQUEST','service-object',requestCount);
             const quoteCount=quoteCounts.get(source.id)??0;
             if(quoteCount)add('APPROVAL','quotes',quoteCount);
             if(cost.plannedMinutes!==null&&cost.actualMinutes>cost.plannedMinutes)add('OVERRUN','effort',cost.actualMinutes-cost.plannedMinutes);

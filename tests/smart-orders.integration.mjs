@@ -77,7 +77,8 @@ test('Message intake and QR passports preserve permissions consistency privacy a
    assert.equal((await req('/orders/'+created.orderId+'/passport/photos',{...photoInput,idempotencyKey:randomUUID(),image:Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>').toString('base64')},owner.cookie)).status,400);
    await passports.photo(owner,created.orderId,{...photoInput,idempotencyKey:randomUUID(),shared:false});
    const publicView=await req('/passport/read',{token});assert.equal(publicView.status,200);assert.equal(publicView.cache,'no-store');assert.equal(publicView.body.photos.length,1);
-   const keys=Object.keys(publicView.body).sort();assert.deepEqual(keys,['companyName','number','title','status','dueDate','orderVersion','revision','expiresAt','active','confirmedAt','photos'].sort());
+   const keys=Object.keys(publicView.body).sort();assert.deepEqual(keys,['companyName','number','title','status','dueDate','orderVersion','revision','expiresAt','active','confirmedAt','photos','canRequestService'].sort());
+   assert.equal(publicView.body.canRequestService,false);
    assert.equal(JSON.stringify(publicView.body).includes('private notes'),false);assert.equal(JSON.stringify(publicView.body).includes('+7700'),false);
    assert.equal((await req('/passport/read',{token,organizationId:org})).status,400);
   });

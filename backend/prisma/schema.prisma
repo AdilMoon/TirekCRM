@@ -176,6 +176,7 @@ model MailMessage {
   @@index([deliveryMode,status,nextAttemptAt,createdAt])
 }
 model Client {
+  serviceObjects ServiceObject[]
   id             String @id @default(uuid()) @db.Uuid
   organizationId String @db.Uuid
   organization   Organization @relation(fields: [organizationId], references: [id])
@@ -196,6 +197,10 @@ model Client {
   @@index([organizationId, createdAt, id])
 }
 model Order {
+  serviceObjectId String? @db.Uuid
+  serviceObject ServiceObject? @relation(fields:[serviceObjectId,clientId,organizationId],references:[id,clientId,organizationId],onDelete:Restrict,onUpdate:NoAction)
+  serviceRequests ServiceRequest[] @relation("RequestSource")
+  convertedRequests ServiceRequest[] @relation("RequestResult")
   acceptance OrderAcceptance?
   repeatOfId String? @db.Uuid
   repeatOf Order? @relation("RepeatVisits", fields:[repeatOfId,organizationId], references:[id,organizationId], onDelete:Restrict, onUpdate:NoAction)
@@ -235,11 +240,58 @@ model Order {
   expenseReceipts ExpenseReceipt[]
   workTimeAllocations WorkTimeAllocation[]
   @@unique([organizationId, number])
+  @@unique([id,clientId,organizationId])
+  @@index([organizationId,serviceObjectId,createdAt,id])
   @@unique([organizationId, repeatKey])
   @@index([organizationId, repeatOfId])
   @@unique([id, organizationId])
   @@index([organizationId, status, createdAt])
   @@index([organizationId, createdAt, id])
+}
+model ServiceObject {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  clientId String @db.Uuid
+  client Client @relation(fields:[clientId,organizationId],references:[id,organizationId],onDelete:Restrict)
+  name String @db.VarChar(160)
+  address String @default("") @db.VarChar(300)
+  creationKey String @db.Uuid
+  inputHash String @db.Char(64)
+  createdAt DateTime @default(now())
+  orders Order[]
+  requests ServiceRequest[]
+  @@unique([id,clientId,organizationId])
+  @@unique([organizationId,creationKey])
+  @@index([organizationId,clientId,createdAt,id])
+}
+enum ServiceRequestStatus {
+  NEW
+  CONVERTED
+  DECLINED
+}
+model ServiceRequest {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  clientId String @db.Uuid
+  objectId String @db.Uuid
+  object ServiceObject @relation(fields:[objectId,clientId,organizationId],references:[id,clientId,organizationId],onDelete:Restrict,onUpdate:NoAction)
+  sourceOrderId String @db.Uuid
+  sourceOrder Order @relation("RequestSource",fields:[sourceOrderId,clientId,organizationId],references:[id,clientId,organizationId],onDelete:Cascade,onUpdate:NoAction)
+  convertedOrderId String? @db.Uuid
+  convertedOrder Order? @relation("RequestResult",fields:[convertedOrderId,clientId,organizationId],references:[id,clientId,organizationId],onDelete:Restrict,onUpdate:NoAction)
+  status ServiceRequestStatus @default(NEW)
+  version Int @default(1)
+  description String @db.VarChar(1000)
+  submissionKey String @db.Uuid
+  tokenHash String @db.Char(64)
+  inputHash String @db.Char(64)
+  decisionHash String? @db.Char(64)
+  decisionNote String @default("") @db.VarChar(300)
+  decidedAt DateTime?
+  createdAt DateTime @default(now())
+  @@unique([tokenHash,submissionKey])
+  @@index([organizationId,objectId,createdAt,id])
+  @@index([organizationId,sourceOrderId,status])
 }
 model OrderAcceptance {
   orderId String @id @db.Uuid

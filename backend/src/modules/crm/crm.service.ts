@@ -83,6 +83,7 @@ export class CrmService {
       const booking=await tx.workBooking.findFirst({where:{orderId:id,organizationId:org,releasedAt:null}});
       if(booking&&input.dueDate&&almatyTime(booking.startsAt).day>input.dueDate)throw new ConflictException('Срок раньше назначенной работы. Сначала перенесите назначение');
       if(previous.payments.length && previous.clientId!==input.clientId)throw new ConflictException('Нельзя менять клиента после получения оплаты');
+      if(previous.serviceObjectId&&previous.clientId!==input.clientId)throw new ConflictException('Клиента заказа с объектом обслуживания нельзя менять');
       if(!await tx.client.findFirst({where:{id:input.clientId,organizationId:org}}))throw new NotFoundException('Клиент не найден');
       const total=totalForItems(input.items);
       if(cents(total)>999999999999999999n)throw new ConflictException('Сумма заказа слишком велика');

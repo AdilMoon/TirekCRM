@@ -6,9 +6,11 @@ import { Pagination } from '../components/pagination';
 import { useI18n } from '../i18n/provider';
 import { usePage } from '../lib/use-page';
 import { api } from '../lib/api';
+import {ServiceObjectPanel} from './service-object';
 
 export function TaskDiscussion({task,close,onSessionExpired}:{task:BusinessTask;close:()=>void;onSessionExpired?:()=>void}) {
  const {t,formatDate}=useI18n();
+ const [objectOpen,setObjectOpen]=useState(false);
  const [page,setPage]=useState(1),[body,setBody]=useState(''),[sending,setSending]=useState(false);
  const [uncertain,setUncertain]=useState(false);
  const [error,setError]=useState(''),[notice,setNotice]=useState(''),[accessLost,setAccessLost]=useState(false);
@@ -38,9 +40,11 @@ export function TaskDiscussion({task,close,onSessionExpired}:{task:BusinessTask;
    if(failure.status===403||failure.status===404)setAccessLost(true);
   }finally{inFlight.current=false;setSending(false);}
  }
+ if(objectOpen&&task.order)return <ServiceObjectPanel id={task.order.id} close={()=>setObjectOpen(false)}/>;
  return <ModalShell title={t('Обсуждение задачи')} onClose={close} busy={sending}>
  <section className="task-discussion">
  <h3>{task.title}</h3>
+ {task.order&&<button className="button secondary" disabled={sending} onClick={()=>setObjectOpen(true)}>{t('Объект и история обслуживания')}</button>}
  <p className="form-note">{t('История доступна владельцу и текущему исполнителю, включая сообщения до переназначения.')}</p>
  <p className="form-note">{t('Комментарии сохраняются без редактирования. Новые сообщения — сверху.')}</p>
  {(error||list.error)&&<div className="alert" role="alert">{t(error||list.error)}</div>}

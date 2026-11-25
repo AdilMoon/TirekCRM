@@ -18,6 +18,7 @@ const view=(order:PassportOrder,publicOnly:boolean,viewer?:{id:string;owner:bool
  orderVersion:order.version,revision:order.passport?.revision??0,expiresAt:order.passport?.expiresAt??null,active:active(order.passport),
  confirmedAt:active(order.passport)&&order.status==='COMPLETED'&&order.passport?.confirmedOrderVersion===order.version&&order.passport.confirmedRevision===order.passport.revision?order.passport.confirmedAt:null,
  ...(!publicOnly?{canPublish:viewer?.owner??false}:{}),
+ canRequestService:active(order.passport)&&order.status==='COMPLETED'&&!!order.serviceObjectId,
  photos:order.photos.filter(p=>!publicOnly||p.shared).map(p=>({id:p.id,phase:p.phase,shared:p.shared,image:'data:image/jpeg;base64,'+Buffer.from(p.image).toString('base64'),...(!publicOnly?{canDelete:!!viewer&&(viewer.owner||p.createdById===viewer.id)}:{})})),
 });
 

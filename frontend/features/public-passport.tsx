@@ -5,6 +5,7 @@ import {stageLabels,type OrderPassport} from '@tirek/contracts';
 import {Brand} from '../components/ui';
 import {useI18n,LanguageSwitcher} from '../i18n/provider';
 import {api} from '../lib/api';
+import {PassportServiceRequest} from './passport-service-request';
 export function PublicPassport(){
  const {t,dateLabel,formatDate}=useI18n();
  const [token,setToken]=useState<string|null>(null),[data,setData]=useState<OrderPassport|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),[agreed,setAgreed]=useState(false),[attempt,setAttempt]=useState(0);
@@ -32,6 +33,7 @@ export function PublicPassport(){
     {data.confirmedAt?<p className="passport-accepted" role="status"><CheckCircle2 size={20}/>{t('Вы подтвердили выполнение')} · {formatDate(data.confirmedAt,{day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'})}</p>:data.status==='COMPLETED'?<><label className="passport-check"><input type="checkbox" checked={agreed} onChange={e=>setAgreed(e.target.checked)} disabled={busy}/>{t('Я ознакомился с результатом и подтверждаю выполнение работы')}</label><button className="button primary" disabled={!agreed||busy} onClick={confirm}>{t('Подтвердить выполнение')}</button></>:<p>{t('Подтверждение станет доступно после завершения работы компанией.')}</p>}
     <p className="form-note">{t('Это отметка по ссылке, а не электронная подпись или подтверждение оплаты.')}</p>
    </section>
+   {data.canRequestService&&token&&<PassportServiceRequest key={token} token={token}/>}
   </>}
  </main><footer>{t('Tirek · опора вашего бизнеса')}</footer></div>;
 }

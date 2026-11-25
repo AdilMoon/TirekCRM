@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import './order-attention.css';
+import './service-objects.css';
 import './mobile.css';
 import './smart-orders.css';
 import './scheduling.css';

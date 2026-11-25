@@ -1,8 +1,8 @@
 import {z} from 'zod';
 import type {PageResult,Stage} from './index';
-export const attentionReasons=['LOSS','INCOMPLETE','RECEIPTS','APPROVAL','OVERRUN','TIME_REVIEW','DEADLINE'] as const;
+export const attentionReasons=['LOSS','INCOMPLETE','RECEIPTS','APPROVAL','OVERRUN','TIME_REVIEW','DEADLINE','SERVICE_REQUEST'] as const;
 export type AttentionReason=typeof attentionReasons[number];
-export type AttentionTarget='profitability'|'effort'|'quotes'|'details';
+export type AttentionTarget='profitability'|'effort'|'quotes'|'details'|'service-object';
 export const attentionQuerySchema=z.strictObject({
   q:z.string().trim().max(160).default(''),
   reason:z.enum(attentionReasons).optional(),

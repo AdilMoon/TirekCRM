@@ -46,6 +46,7 @@ export function OrderPassportManager({id,close}:{id:string;close:()=>void}){
  const photoCount=data?.photoCount??data?.photos.length??0;
  return <ModalShell title={t('QR-паспорт заказа')} onClose={close} busy={busy} className="passport-modal">
   <p className="form-note">{t('По ссылке видны название, статус, срок и выбранные фото. Ссылку сможет открыть любой, у кого она есть.')}</p>
+  {data?.canPublish&&<p className="form-note">{t('В завершённом заказе с объектом получатель ссылки также может отправить обращение на обслуживание.')}</p>}
   {error&&<p className="form-error" role="alert">{t(error)} <button className="text-button" disabled={busy} onClick={()=>{setReview(null);setApproved(false);setRetry(v=>v+1);}}>{t('Обновить')}</button></p>}
   {!data?(!error&&<p role="status">{t('Загрузка…')}</p>):<>
    {data.confirmedAt&&<p className="passport-accepted" role="status">{t('Клиент подтвердил выполнение')} · {formatDate(data.confirmedAt,{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</p>}

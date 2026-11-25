@@ -1,0 +1,19 @@
+.service-object-modal {width:min(820px,calc(100% - 24px))}
+.service-object-heading {margin:24px 0;padding:20px;background:var(--surface-soft,#f3f8f6);border-radius:16px;overflow-wrap:anywhere}
+.service-object-heading h3 {font-size:22px;margin:8px 0}
+.service-object-heading p {margin-bottom:0}
+.service-object-form,.service-object-section {margin-top:24px}
+.service-object-section {border-top:1px solid var(--border,#e4e9ec);padding-top:20px}
+.service-history article,.service-choice {display:flex;align-items:center;gap:12px;padding:16px 0;border-bottom:1px solid var(--border,#e4e9ec)}
+.service-history article>div,.service-choice>div {flex:1;min-width:0;overflow-wrap:anywhere}
+.service-history small,.service-choice small,.service-request header small {display:block;color:var(--muted,#718096);margin-top:6px}
+.service-request {padding:20px;border:1px solid var(--border,#e4e9ec);border-radius:16px;margin:16px 0;overflow-wrap:anywhere}
+.service-request-description {white-space:pre-wrap}
+.passport-service-request {margin-top:24px;padding:26px}
+.passport-service-request h2 {font-size:20px;margin:0 0 12px}
+.passport-service-request>p {font-size:14px;line-height:1.7;color:var(--muted)}
+.passport-service-request .editor-form {margin-top:18px}
+.passport-service-request label {font-size:13px;line-height:1.6}
+.passport-service-request textarea {font:inherit;line-height:1.7;resize:vertical}
+.passport-service-request .form-note {font-size:12px;line-height:1.7}
+@media(max-width:600px){.service-history article,.service-choice {align-items:flex-start;flex-wrap:wrap}.service-history article>div,.service-choice>div {flex-basis:100%}.service-request {padding:14px}.service-object-modal .form-actions {flex-wrap:wrap}}

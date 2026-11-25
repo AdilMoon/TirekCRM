@@ -136,6 +136,14 @@ export type OrderQuery = z.infer<typeof orderQuerySchema>;
 export type AuditQuery = z.infer<typeof auditQuerySchema>;
 export type UpdateOrderInput = z.infer<typeof updateOrderSchema>;
 export interface PageResult<T> { items:T[]; page:number; pageSize:number; total:number; pages:number }
+export const clientOverviewQuerySchema=listQuerySchema.extend({status:z.enum(stages).optional(),unpaid:z.literal('true').optional()}).strict();
+export type ClientOverviewQuery=z.infer<typeof clientOverviewQuerySchema>;
+export interface ClientOrderRow {
+ id:string;number:number;title:string;status:Stage;createdAt:string;dueDate:string|null;total:string;paid:string;balance:string;
+}
+export interface ClientOverviewPage extends PageResult<ClientOrderRow> {
+ client:Client;summary:{orders:number;active:number;completed:number;total:string;paid:string;outstanding:string};
+}
 export interface AuditEvent {
  id:string; actorName:string; entityType:string; entityId:string; action:string;
  metadata:Record<string, unknown>; createdAt:string;

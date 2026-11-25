@@ -79,6 +79,8 @@
 .amount.refund { color:#a03332; }
 .amount.expense_reversal { color:var(--green); }
 .report-controls .tabs { flex-wrap:wrap; }
+.client-overview-contact>div{flex:1;min-width:0}.client-overview-contact>button{flex-shrink:0;white-space:nowrap}.client-overview .client-unpaid-filter{flex-direction:row;align-items:center;justify-content:flex-start}
+.modal.client-overview-modal{width:min(1100px,calc(100% - 32px))}.client-overview-contact{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;overflow-wrap:anywhere}.client-overview-contact h3{margin:0 0 8px}.client-overview-contact p{margin:6px 0;color:var(--muted);font-size:13px}.client-unpaid-filter{display:flex;align-items:center;gap:8px;font-size:12px}.client-unpaid-filter input{width:auto}.client-overview .stats-grid{margin:0}.client-overview .report-scope{line-height:1.6}.client-overview .search-box{min-width:0}.client-overview .stat-value{overflow-wrap:anywhere}@media(max-width:760px){.client-overview-contact{flex-direction:column}.client-overview .table-toolbar{align-items:stretch}.client-overview .table-toolbar>.search-box{width:100%}}
 .payment-control-info>.report-scope{margin:0 24px 14px;line-height:1.5}
 @media(max-width:760px) { .financial-operation { padding:16px; } }
 .report-export-bar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}

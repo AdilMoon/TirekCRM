@@ -22,6 +22,7 @@ import { DocumentDirectory } from '../features/reports';
 import {FinanceWorkspace} from '../features/payment-control';
 import { MoneyChart } from '../features/money-chart';
 import { ClientDirectory, OrderDirectory } from '../features/directories';
+import {ClientOverview} from '../features/client-overview';
 import { AuditTrail } from '../features/audit-trail';
 import { Editor } from '../features/editor';
 
@@ -46,6 +47,7 @@ const navigation = [
   const [data, setData] = useState(emptyData);
   const [section, setSection] = useState<Section>('overview');
   const [modal, setModal] = useState<Modal | null>(null);
+  const [clientOverviewId,setClientOverviewId]=useState<string|null>(null);
   const [attentionRequested,setAttentionRequested]=useState(false);
   const [messageOpen,setMessageOpen]=useState(false);
   const [error, setError] = useState('');
@@ -137,7 +139,7 @@ const navigation = [
         <div className="bottom-summary"><span><Users size={16} /><strong>{dashboard.clientsCount}</strong>  {t("клиентов в базе")}</span><span><BriefcaseBusiness size={16} /><strong>{dashboard.activeOrders}</strong>  {t("заказов в работе")}</span><span><FileText size={16} /><strong>{dashboard.documentsCount}</strong>  {t("документов в базе")}</span></div>
       </>}
       {section === 'orders' && <OrderDirectory key={String(attentionRequested)} revision={data} onSelect={openOrder} initialAttention={attentionRequested}/>}
-      {section === 'clients' && <ClientDirectory revision={data} onSelect={client=>setModal({kind:'client',client})}/>}
+      {section === 'clients' && <ClientDirectory revision={data} onSelect={client=>setModal({kind:'client',client})} onOverview={setClientOverviewId}/>}
       {section === 'tasks' && <Tasks user={user}/>}
       {section === 'team' && <Team user={user}/>}
       {section === 'workTime' && <WorkTime owner/>}
@@ -151,6 +153,7 @@ const navigation = [
     </main></div>
     {toast && <div className="toast" role="status"><CheckCircle2 size={19} />{t(toast)}</div>}
     {modal && <Editor key={`${modal.kind}-${modal.order?.id ?? modal.client?.id ?? ''}`} modal={modal} close={() => setModal(null)} saved={saved} setModal={setModal} />}
+    {clientOverviewId&&<ClientOverview key={clientOverviewId} id={clientOverviewId} revision={data} onClose={()=>setClientOverviewId(null)} onEdit={client=>{setClientOverviewId(null);setModal({kind:'client',client});}} onOrder={id=>{setClientOverviewId(null);openOrder({id});}}/>}
     {messageOpen&&<MessageOrder close={()=>setMessageOpen(false)} created={async id=>{setMessageOpen(false);setToast(t('Заказ создан'));try{await refresh();await openOrder({id});}catch(e){setError((e as Error).message);}}}/>}
   </div>;
 }

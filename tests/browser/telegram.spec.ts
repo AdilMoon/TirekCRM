@@ -19,7 +19,7 @@ test('employee reviews Telegram identity explicitly confirms and disconnects on 
   if(path==='/api/telegram'&&request.method()==='DELETE'){linked=false;pending=false;}
   await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(result)});
  });
- await page.getByRole('button',{name:'Настроить Telegram',exact:true}).click();await page.getByRole('button',{name:'Создать ссылку подключения',exact:true}).click();await expect(page.getByRole('link',{name:'Открыть бота и нажать Start',exact:true})).toHaveAttribute('href',/https:\/\/t.me\/fixture_tirek_bot/);
+ await page.getByRole('button',{name:'Настройки аккаунта',exact:true}).click();await page.getByRole('button',{name:'Настроить Telegram',exact:true}).click();await page.getByRole('button',{name:'Создать ссылку подключения',exact:true}).click();await expect(page.getByRole('link',{name:'Открыть бота и нажать Start',exact:true})).toHaveAttribute('href',/https:\/\/t.me\/fixture_tirek_bot/);
  expect(confirmed).toBe(0);claimed=true;await page.getByRole('button',{name:'Обновить состояние',exact:true}).click();await expect(page.getByText('Employee <profile>',{exact:false})).toBeVisible();
  const confirm=page.getByRole('button',{name:'Подтвердить подключение',exact:true});await expect(confirm).toBeDisabled();await page.getByRole('checkbox',{name:'Это мой Telegram. Разрешаю присылать мне рабочие задачи.',exact:true}).check();await confirm.click();await expect(page.getByRole('status')).toContainText('Telegram подключён');expect(confirmed).toBe(1);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await page.screenshot({path:'test-results/telegram-connected-mobile.png',fullPage:true,animations:'disabled'});

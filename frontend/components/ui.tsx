@@ -1,6 +1,6 @@
 'use client';
 import { useI18n } from '../i18n/provider';
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode, type KeyboardEvent } from 'react';
 import { Search, X, BriefcaseBusiness } from 'lucide-react';
 import { stageLabels, type Stage } from '@tirek/contracts';
 
@@ -20,6 +20,16 @@ export function ModalShell({ children, title, onClose, busy = false, className =
   const { t } = useI18n();
 
   const ref = useRef<HTMLDialogElement>(null);
+  function keepFocus(event:KeyboardEvent<HTMLDialogElement>){
+    if(event.key!=='Tab'||event.defaultPrevented)return;
+    const dialog=event.currentTarget;
+    const controls=Array.from(dialog.querySelectorAll<HTMLElement>('button,input,select,textarea,a[href],summary,[tabindex]'))
+      .filter(element=>element.tabIndex>=0&&!element.matches(':disabled')&&element.getClientRects().length>0&&!element.closest('[inert]'));
+    const first=controls[0],last=controls.at(-1),active=document.activeElement;
+    if(!first){event.preventDefault();dialog.focus();}
+    else if(event.shiftKey&&(active===first||active===dialog)){event.preventDefault();last!.focus();}
+    else if(!event.shiftKey&&(active===last||active===dialog)){event.preventDefault();first.focus();}
+  }
   useEffect(() => {
     const dialog = ref.current;
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -28,7 +38,7 @@ export function ModalShell({ children, title, onClose, busy = false, className =
     document.body.style.overflow = 'hidden';
     return () => { dialog?.close(); document.body.style.overflow = old; if(previousFocus?.isConnected)previousFocus.focus({preventScroll:true}); };
   }, []);
-  return <dialog ref={ref} id={id} className={`modal ${className}`} aria-label={title} onCancel={e => { e.preventDefault(); if (!busy) onClose(); }} onClick={e => { if (e.target === e.currentTarget && !busy) onClose(); }}>
+  return <dialog ref={ref} id={id} tabIndex={-1} className={`modal ${className}`} aria-label={title} onKeyDown={keepFocus} onCancel={e => { e.preventDefault(); if (!busy) onClose(); }} onClick={e => { if (e.target === e.currentTarget && !busy) onClose(); }}>
     <div className="modal-inner"><div className="modal-head"><h2>{title}</h2><button className="icon-button" autoFocus aria-label={t("Закрыть")} disabled={busy} onClick={onClose}><X size={20} /></button></div>{children}</div>
   </dialog>;
 }

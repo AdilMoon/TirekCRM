@@ -3,6 +3,7 @@ import './globals.css';
 import './order-attention.css';
 import './service-objects.css';
 import './employee-workflow.css';
+import './workspace-refinement.css';
 import './mobile.css';
 import './smart-orders.css';
 import './scheduling.css';

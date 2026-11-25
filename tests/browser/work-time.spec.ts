@@ -1,3 +1,4 @@
+import {navigateWorkspace} from './fixtures';
 import 'dotenv/config';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
@@ -45,7 +46,7 @@ test('employee files overtime, owner closes the month and downloads CSV in Edge'
   };
   await page.setViewportSize({ width: 390, height: 844 });
   await signIn(employeeToken);
-  await page.getByRole('button', { name: 'Табель', exact: true }).click();
+  await navigateWorkspace(page,'Табель');
   await page.getByRole('button', { name: 'Записать фактическое время' }).click();
   const dialog = page.getByRole('dialog');
   await dialog.getByLabel('Вид времени').selectOption('OVERTIME');
@@ -65,7 +66,7 @@ test('employee files overtime, owner closes the month and downloads CSV in Edge'
   await expect(management).toHaveAttribute('aria-expanded', 'true');
   await expect(page.getByRole('button', { name: 'Команда', exact: true })).toBeVisible();
   await management.click();
-  await page.getByRole('button', { name: 'Табель', exact: true }).click();
+  await navigateWorkspace(page,'Табель');
   await page.getByLabel('Месяц табеля').fill('2025-11');
   const record = page.locator('.work-time-entry').filter({ hasText: 'Employee QA' });
   await record.getByRole('button', { name: 'Подтвердить часы' }).click();

@@ -1,0 +1,15 @@
+.settings-tabs {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:22px;max-width:740px}
+.settings-tabs .button {white-space:normal;text-align:center;min-width:0}
+.settings-space>[role="tabpanel"][hidden] {display:none}
+.heading-actions .message-order-shortcut {white-space:normal}
+.finance-documents-shortcut {margin-bottom:20px}
+.employee-first-day.completed {padding:18px 22px}
+.first-day-complete-summary {display:flex;align-items:center;gap:14px}
+.first-day-complete-summary>svg {flex-shrink:0;color:#216b57}
+.first-day-complete-summary>div {flex:1;min-width:0}
+.first-day-complete-summary h2 {font-size:16px;margin:0 0 6px;overflow-wrap:anywhere}
+.first-day-complete-summary small {font-size:12px;color:var(--muted)}
+.first-day-complete-summary .text-button {max-width:210px;white-space:normal;text-align:left}
+.employee-first-day.completed>.text-button {font-size:12px;margin-top:14px}
+@media(max-width:600px){.settings-tabs {gap:6px}.settings-tabs .button {font-size:12px;padding:10px 6px}.employee-first-day.completed {padding:16px}.first-day-complete-summary {flex-wrap:wrap}.first-day-complete-summary .text-button {max-width:none;margin-left:40px}.heading-actions .message-order-shortcut {width:100%}}
+@media(max-width:600px){.first-day-complete-summary>div {flex:1 0 calc(100% - 40px)}.first-day-complete-summary .text-button {flex:0 1 calc(100% - 40px)}}

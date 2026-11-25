@@ -1,3 +1,4 @@
+import {navigateWorkspace} from './fixtures';
 import 'dotenv/config';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
@@ -100,7 +101,7 @@ test('employee logs time and owner verifies the overrun report and order profita
   await expect(dialog.locator('.effort-metrics')).toContainText('Нет подтверждённых часов');
   await dialog.getByRole('button', { name: 'Закрыть', exact: true }).click();
   await dialog.getByRole('button', { name: 'Закрыть', exact: true }).click();
-  await page.getByRole('button', { name: 'Табель', exact: true }).click();
+  await navigateWorkspace(page,'Табель');
   await page.getByLabel('Месяц табеля').fill('2025-11');
   const entry = page.locator('.work-time-entry').filter({ hasText: 'Айдана QA' });
   await expect(entry).toContainText('Монтаж витрины QA');

@@ -15,7 +15,7 @@ test.afterAll(async()=>{await db.$disconnect();});
 
 test('owner handles requests on mobile in RU KK EN with safe retries and audit',async({page,context},testInfo)=>{
  await login(context);await page.setViewportSize({width:390,height:844});await page.goto('/');
- await page.getByRole('button',{name:'Меню',exact:true}).click();await openManagement(page);await page.getByRole('button',{name:'Настройки',exact:true}).click();
+ await page.getByRole('button',{name:'Меню',exact:true}).click();await openManagement(page);await page.getByRole('button',{name:'Настройки',exact:true}).click();await page.getByRole('tab',{name:'Обращения по данным',exact:true}).click();
  await page.getByRole('button',{name:'Зарегистрировать обращение',exact:true}).click();
  const requester='Requester '+'Ж'.repeat(90),description='Correct record <img src=x onerror=alert(1)>\nSecond line';
  await page.getByLabel('Имя заявителя *',{exact:true}).fill(requester);
@@ -79,7 +79,7 @@ test('owner handles requests on mobile in RU KK EN with safe retries and audit',
 test('stale changes fail without overwriting, lost access hides private request details',async({page,context})=>{
  await login(context);
  const created=await page.request.post('/api/privacy-requests',{headers:{Origin:'http://localhost:3000'},data:{kind:'ACCESS',subjectName:'Confidential requester',description:'Private request contents',receivedOn:'2020-01-01',idempotencyKey:randomUUID()}});expect(created.status()).toBe(201);const row=await created.json();
- await page.goto('/');await openManagement(page);await page.getByRole('button',{name:'Настройки',exact:true}).click();await page.getByRole('button',{name:'Открыть обращение',exact:true}).click();
+ await page.goto('/');await openManagement(page);await page.getByRole('button',{name:'Настройки',exact:true}).click();await page.getByRole('tab',{name:'Обращения по данным',exact:true}).click();await page.getByRole('button',{name:'Открыть обращение',exact:true}).click();
  const dialog=page.getByRole('dialog');await expect(dialog).toContainText('Private request contents');
  const external=await page.request.patch('/api/privacy-requests/'+row.id,{headers:{Origin:'http://localhost:3000'},data:{version:1,status:'REJECTED',resolution:'Externally reviewed and answered',idempotencyKey:randomUUID()}});expect(external.status()).toBe(200);
  await dialog.getByRole('button',{name:'Сохранить статус обращения',exact:true}).click();await expect(dialog.getByRole('alert')).toContainText('Обращение уже изменено');
@@ -100,7 +100,7 @@ test('revoked owner cannot submit an already open request and private details ar
  await login(context);
  const created=await page.request.post('/api/privacy-requests',{headers:{Origin:'http://localhost:3000'},data:{kind:'ACCESS',subjectName:'Revocation QA',contact:'private@privacy.invalid',description:'Confidential loaded details',receivedOn:'2020-01-01',idempotencyKey:randomUUID()}});
  expect(created.status()).toBe(201);const row=await created.json();
- await page.goto('/');await openManagement(page);await page.getByRole('button',{name:'Настройки',exact:true}).click();await page.getByRole('button',{name:'Открыть обращение',exact:true}).click();
+ await page.goto('/');await openManagement(page);await page.getByRole('button',{name:'Настройки',exact:true}).click();await page.getByRole('tab',{name:'Обращения по данным',exact:true}).click();await page.getByRole('button',{name:'Открыть обращение',exact:true}).click();
  const dialog=page.getByRole('dialog');await expect(dialog).toContainText('Confidential loaded details');
  await expect(dialog.locator('.audit-panel')).toHaveAttribute('aria-busy','false');
  await db.user.update({where:{id:userId},data:{role:'EMPLOYEE'}});

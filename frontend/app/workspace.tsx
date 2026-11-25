@@ -1,13 +1,12 @@
 'use client';
-import {PrivacyRequests} from '../features/privacy-requests';
 import {MessageOrder} from '../features/message-order';
 import { useI18n, LanguageSwitcher } from '../i18n/provider';
 
 import { useCallback, useEffect, useState } from 'react';
-import { ArrowDownLeft, ArrowUpRight, ArrowRight, CalendarDays, ChevronDown, ChevronRight, CircleHelp, FileText, LayoutDashboard, LogOut, Menu, Plus, Users, Wallet, BriefcaseBusiness, LoaderCircle, CheckCircle2, Clock3, Settings2, History, SlidersHorizontal } from 'lucide-react';
-import { type SessionUser, type Client, type Order, type Dashboard } from '@tirek/contracts';
+import { ArrowDownLeft, ArrowUpRight, ArrowRight, CalendarDays, ChevronDown, ChevronRight, FileText, LayoutDashboard, LogOut, Menu, Plus, Users, Wallet, BriefcaseBusiness, LoaderCircle, CheckCircle2, Clock3, Settings2, History, SlidersHorizontal } from 'lucide-react';
+import { type SessionUser, type Order, type Dashboard, type PageResult } from '@tirek/contracts';
 import { api } from '../lib/api';
-const emptyData = { clients: [] as Client[], orders: [] as Order[], dashboard: null as Dashboard | null };
+const emptyData = { orders: [] as Order[], dashboard: null as Dashboard | null };
 
 import { NotificationCenter } from '../features/notifications';
 import { GettingStarted } from '../features/getting-started';
@@ -24,24 +23,22 @@ import { MoneyChart } from '../features/money-chart';
 import { ClientDirectory, OrderDirectory } from '../features/directories';
 import { AuditTrail } from '../features/audit-trail';
 import { Editor } from '../features/editor';
-import { AccountSecurity } from '../features/account-security';
-import {TelegramConnect} from '../features/telegram-connect';
-import { OrganizationSettings } from '../features/organization-settings';
+
+
+
 import type { Section, Modal } from '../types/workspace';
-const managementSections: Section[] = ['team', 'history', 'settings'];
+import {WorkspaceSettings} from '../features/workspace-settings';
+const managementSections: Section[] = ['team', 'workTime', 'documents', 'history', 'settings'];
 
 export default function Workspace() {
   const { t, formatDate, formatMoney } = useI18n();
 
 const navigation = [
-  { id: 'overview', label: t("Обзор"), icon: LayoutDashboard }, { id: 'clients', label: t("Клиенты"), icon: Users },
-  { id: 'orders', label: t("Заказы"), icon: BriefcaseBusiness }, { id: 'finances', label: t("Финансы"), icon: Wallet },
-  { id: 'documents', label: t("Документы"), icon: FileText },
-{ id:'tasks',label:t('Задачи'),icon:CheckCircle2 },
-{ id:'team',label:t('Команда'),icon:Users },
-{ id:'workTime',label:t('Табель'),icon:Clock3 },
-{ id:'history', label:t('История действий'), icon:History },
-{ id:'settings', label:t("Настройки"), icon:Settings2 },
+ {id:'overview',label:t('Обзор'),icon:LayoutDashboard},{id:'clients',label:t('Клиенты'),icon:Users},
+ {id:'orders',label:t('Заказы'),icon:BriefcaseBusiness},{id:'tasks',label:t('Задачи'),icon:CheckCircle2},
+ {id:'finances',label:t('Финансы'),icon:Wallet},{id:'team',label:t('Команда'),icon:Users},
+ {id:'workTime',label:t('Табель'),icon:Clock3},{id:'documents',label:t('Документы'),icon:FileText},
+ {id:'history',label:t('История действий'),icon:History},{id:'settings',label:t('Настройки'),icon:Settings2},
 ] as const;
   const [user, setUser] = useState<SessionUser | null>(null);
   const [boot, setBoot] = useState(true);
@@ -60,10 +57,10 @@ const navigation = [
   async function refresh() {
     setRefreshing(true);
     try {
-      const [dashboard, clients, orders] = await Promise.all([
-        api<Dashboard>('/dashboard'), api<Client[]>('/clients'), api<Order[]>('/orders'),
+      const [dashboard, orders] = await Promise.all([
+        api<Dashboard>('/dashboard'), api<PageResult<Order>>('/orders/search?pageSize=5'),
       ]);
-      setData({ dashboard, clients, orders }); setError('');
+      setData({ dashboard, orders:orders.items }); setError('');
     } catch (e) {
       if ((e as Error & { status?: number }).status === 401) { setUser(null); setData(emptyData); }
       throw e;
@@ -98,7 +95,7 @@ const navigation = [
     <button type="button" key={id} className={`nav-item ${section === id ? 'active' : ''}`}
       aria-current={section === id ? 'page' : undefined} onClick={() => navigate(id)}>
       <Icon size={19} strokeWidth={1.7} aria-hidden="true"/><span>{label}</span>
-      {id === 'orders' && !!dashboard?.activeOrders && <small>{dashboard.activeOrders}</small>}
+      {id === 'orders' && !!dashboard?.activeOrders && <small aria-hidden="true">{dashboard.activeOrders}</small>}
     </button>
   );
   const day = formatDate(new Date(), { day: 'numeric', month: 'long', weekday: 'long', timeZone: 'Asia/Almaty' });
@@ -116,15 +113,14 @@ const navigation = [
           {navigation.filter(item => managementSections.includes(item.id)).map(navItem)}
         </div>
       </nav>
-      <div className="sidebar-bottom"><button className="help-button" onClick={() => { closeMobileMenu(); setModal({ kind: 'about' }); }}><CircleHelp size={18} />  {t("О проекте")} <ArrowUpRight size={15} /></button>
+      <div className="sidebar-bottom">
       <div className="profile"><span className="user-avatar">{t("В")}</span><div><strong>{user.name}</strong><span>{t("Владелец компании")}</span></div><button aria-label={t("Выйти")} className="icon-button" onClick={async () => { try { await api('/auth/logout', { method: 'POST' }); setUser(null); setData(emptyData); } catch (e) { setError((e as Error).message); } }}><LogOut size={17} /></button></div></div>
     </WorkspaceNavigation>
     <div className="main-shell"><header className="topbar"><div className="breadcrumb"><button className="icon-button mobile-menu" aria-label={t("Меню")} aria-expanded={mobileMenu} aria-haspopup="dialog" aria-controls={mobileMenu ? "workspace-navigation" : undefined} onClick={() => setMobileMenu(!mobileMenu)}><Menu size={22} /></button><span>{t("Рабочее пространство")}</span><ChevronRight size={14} /><strong>{selectedNav.label}</strong></div><div className="topbar-right"><NotificationCenter key={user.id} userId={user.id} onSessionExpired={()=>{setUser(null);setData(emptyData);}}/><LanguageSwitcher /><span className="demo-pill">{user.organization.currency}</span><span className="top-date"><CalendarDays size={16} />{formatDate(new Date(), { day: 'numeric', month: 'short', timeZone: 'Asia/Almaty' })}</span></div></header>
     <main>
       {error && <div className="alert" role="alert">{t(error)}<button onClick={() => refresh().catch(e => setError(e.message))}>{t("Обновить")}</button></div>}
       <div className="page-heading"><div><p className="eyebrow">{section === 'overview' ? day : t("{0} / РАБОЧЕЕ ПРОСТРАНСТВО", user.organization.name)}</p><h1>{section === 'overview' ? t("Всё под контролем.") : selectedNav.label}</h1><p className="page-subtitle">{({ overview: t("Ваш бизнес в деталях. Главное — на одном экране."), clients: t("Люди и компании, с которыми вы работаете."), orders: t("От первого обращения до выполненной работы."), finances: t("Поступления и расходы без потерянных деталей."), documents: t("Документы, связанные с вашими заказами."), tasks:t('Договорённости, исполнители и сроки в одном месте.'),team:t('Люди, с которыми вы строите бизнес.'),workTime:t('Запись и проверка фактически отработанных часов.'),history:t('Кто и когда изменил данные'), settings:t("Данные компании для вашего пространства и документов.") })[section]}</p></div>
-      {!['settings','history','tasks','team','workTime'].includes(section) && <div className="heading-actions">{section==='documents'&&<button className="button secondary" onClick={()=>setModal({kind:'invoice'})}><Plus size={17}/>{t('Создать счёт')}</button>}{section === 'finances' && <button className="button secondary" onClick={() => setModal({ kind: 'payment' })}><Plus size={17} />{t("Оплата")}</button>}<button className="button primary" onClick={() => setModal({ kind: section === 'clients' ? 'client' : section === 'finances' ? 'expense' : section === 'documents' ? 'document' : 'order' })}><Plus size={18} />{section === 'clients' ? t("Новый клиент") : section === 'finances' ? t("Добавить расход") : section === 'documents' ? t("Создать акт") : t("Новый заказ")}</button></div>}</div>
-      {['overview','orders'].includes(section)&&<button className="message-launch" onClick={()=>setMessageOpen(true)}><span><strong>{t('Из сообщения в заказ')}</strong><small>{t('Вставьте обращение и проверьте готовые поля')}</small></span><ArrowRight size={24}/></button>}
+      {!['settings','history','tasks','team','workTime'].includes(section) && <div className="heading-actions">{['overview','orders'].includes(section)&&<button className="button secondary message-order-shortcut" onClick={()=>setMessageOpen(true)}>{t('Из сообщения в заказ')}</button>}{section==='documents'&&<button className="button secondary" onClick={()=>setModal({kind:'invoice'})}><Plus size={17}/>{t('Создать счёт')}</button>}{section === 'finances' && <button className="button secondary" onClick={() => setModal({ kind: 'payment' })}><Plus size={17} />{t("Оплата")}</button>}<button className="button primary" onClick={() => setModal({ kind: section === 'clients' ? 'client' : section === 'finances' ? 'expense' : section === 'documents' ? 'document' : 'order' })}><Plus size={18} />{section === 'clients' ? t("Новый клиент") : section === 'finances' ? t("Добавить расход") : section === 'documents' ? t("Создать акт") : t("Новый заказ")}</button></div>}</div>
       {section === 'overview' && dashboard && <>
         {dashboard.clientsCount===0&&<GettingStarted onClient={()=>setModal({kind:'client'})} onSettings={()=>navigate('settings')} onTeam={()=>navigate('team')}/>}
         <div className="section-meta"><span><span className="live-dot" />{t("Сводка бизнеса")}</span><span>{t("За всё время · KZT")}</span></div>
@@ -136,7 +132,7 @@ const navigation = [
         </div>
         <div className="dashboard-middle"><section className="panel chart-panel"><div className="panel-heading"><div><h2>{t("Движение денег")}</h2><p>{t("Как меняются поступления и расходы")}</p></div><span className="subtle-pill">{t("6 месяцев")}</span></div><MoneyChart data={dashboard.monthly} /><div className="chart-legend"><span><i className="income-dot" />{t("Поступления")}</span><span><i className="expense-dot" />{t("Расходы")}</span><small>{t("По датам операций · Алматы")}</small></div></section>
         <section className="panel attention-panel"><div className="panel-heading"><div><h2>{t("Сроки и статусы")} <span className="count-pill">{dashboard.attention.length}</span></h2><p>{t("Ближайшие шаги по заказам")}</p></div></div><div className="attention-list">{dashboard.attention.length ? dashboard.attention.slice(0,4).map((item, i) => <button key={item.id} className="attention-item" onClick={async () => { try { setModal({kind:'details',order:await api<Order>('/orders/'+item.id)}); } catch(e){setError((e as Error).message);} }}><span className={`attention-icon a${i}`}><Clock3 size={17} /></span><span><strong>{item.title}</strong><small>{t(item.reason)}</small></span><ChevronRight size={17} /></button>) : <Empty>{t("Все текущие заказы завершены")}</Empty>}</div><button type="button" className="attention-foot text-button" onClick={()=>navigate("orders",true)}><CheckCircle2 size={16} />{t("Все причины по заказам")}</button></section></div>
-        <section className="panel"><div className="panel-heading"><div><h2>{t("Последние заказы")}</h2><p>{t("Каждое обращение на своём месте")}</p></div><button className="text-button" onClick={() => navigate('orders')}>{t("Все заказы")} <ArrowRight size={16} /></button></div><OrdersTable orders={data.orders.slice(0,5)} onSelect={openOrder} /></section>
+        <section className="panel"><div className="panel-heading"><div><h2>{t("Последние заказы")}</h2><p>{t("Каждое обращение на своём месте")}</p></div><button className="text-button" onClick={() => navigate('orders')}>{t("Все заказы")} <ArrowRight size={16} /></button></div><OrdersTable orders={data.orders} onSelect={openOrder} /></section>
         <div className="bottom-summary"><span><Users size={16} /><strong>{dashboard.clientsCount}</strong>  {t("клиентов в базе")}</span><span><BriefcaseBusiness size={16} /><strong>{dashboard.activeOrders}</strong>  {t("заказов в работе")}</span><span><FileText size={16} /><strong>{dashboard.documentsCount}</strong>  {t("документов в базе")}</span></div>
       </>}
       {section === 'orders' && <OrderDirectory key={String(attentionRequested)} revision={data} onSelect={openOrder} initialAttention={attentionRequested}/>}
@@ -145,9 +141,11 @@ const navigation = [
       {section === 'team' && <Team user={user}/>}
       {section === 'workTime' && <WorkTime owner/>}
       {section === 'history' && <AuditTrail revision={data}/>}
+      {section === 'finances' && <button className="button secondary finance-documents-shortcut" onClick={()=>navigate('documents')}>{t('Счета и акты')}</button>}
+      {section === 'documents' && <button className="text-button finance-documents-shortcut" onClick={()=>navigate('finances')}>{t('К финансам')}</button>}
       {section === 'finances' && <FinanceReport revision={data} onChanged={()=>{refresh().catch(e=>setError(e.message));}} onOrder={id=>openOrder({id})}/>}
       {section === 'documents' && <DocumentDirectory revision={data}/>}
-      {section === 'settings' && <div className="settings-space"><PrivacyRequests/><OrganizationSettings onSaved={async () => { setUser(await api<SessionUser>('/auth/me')); setToast(t("Реквизиты сохранены")); }} /><TelegramConnect/><AccountSecurity onSessionEnded={expired=>{setUser(null);setData(emptyData);setError(expired?'Сессия истекла. Войдите снова':'');}}/></div>}
+      {section === 'settings' && <WorkspaceSettings onSaved={async()=>{setUser(await api<SessionUser>('/auth/me'));setToast(t('Реквизиты сохранены'));}} onSessionEnded={expired=>{setUser(null);setData(emptyData);setError(expired?'Сессия истекла. Войдите снова':'');}}/>}
 <footer className="page-footer"><span>{t("Tirek · опора вашего бизнеса")}</span><span>{refreshing ? t("Обновляем данные…") : t("Данные вашего рабочего пространства")}</span></footer>
     </main></div>
     {toast && <div className="toast" role="status"><CheckCircle2 size={19} />{t(toast)}</div>}

@@ -9,7 +9,7 @@
  .page-heading .heading-actions{flex-direction:row;flex-wrap:wrap}
  .page-heading .heading-actions .button{flex:1}
  .page-subtitle{max-width:none;font-size:13px}
- .button,.icon-button,.text-button,.help-button,.nav-item,.order-title{min-height:44px}
+ .button,.icon-button,.text-button,.nav-item,.order-title{min-height:44px}
  .icon-button{width:44px;height:44px}
  .button,.page-heading .button{font-size:13px;white-space:normal}
  input:not([type="checkbox"]):not([type="radio"]),select,textarea,.language-switcher select,.search-box input{font-size:16px!important;min-height:44px}

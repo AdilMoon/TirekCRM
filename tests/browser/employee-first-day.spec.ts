@@ -1,3 +1,4 @@
+import {navigateWorkspace} from './fixtures';
 import 'dotenv/config';
 import {createHash,randomBytes,randomUUID} from 'node:crypto';
 import {PrismaClient} from '@prisma/client';
@@ -64,7 +65,7 @@ test('owner invites and assigns, employee enters directly and completes photos, 
   await expect(flow.getByRole('button',{name:'Завершить задачу',exact:true})).toBeEnabled();expect(await flow.evaluate(element=>element.scrollWidth<=element.clientWidth)).toBe(true);await employeePage.screenshot({path:testInfo.outputPath('first-day-workflow-mobile.png')});
   await flow.getByRole('button',{name:'Завершить задачу',exact:true}).click();await expect(flow.getByRole('status')).toContainText('Маршрут пройден');await flow.getByRole('button',{name:'Закрыть',exact:true}).click();await employeePage.reload();await expect(card).toContainText('Выполнено шагов: 5 из 5');
   await expect(employeePage.locator('.task-card').filter({hasText:'Первое обслуживание QA'})).toBeVisible();expect(await employeePage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await employeePage.screenshot({path:testInfo.outputPath('first-day-complete-mobile.png'),fullPage:true});
-  await page.getByRole('button',{name:'Табель',exact:true}).click();await page.getByRole('button',{name:'Подтвердить часы',exact:true}).click();await page.getByRole('dialog').getByRole('button',{name:'Подтвердить часы',exact:true}).click();
+  await navigateWorkspace(page,'Табель');await page.getByRole('button',{name:'Подтвердить часы',exact:true}).click();await page.getByRole('dialog').getByRole('button',{name:'Подтвердить часы',exact:true}).click();
   await card.getByRole('button',{name:'Открыть пошаговый маршрут',exact:true}).click();await expect(flow).toContainText('Подтверждено: 60 мин');
   const task=await db.businessTask.findFirstOrThrow({where:{organizationId:org,assigneeId:worker.id}});expect(task.status).toBe('DONE');await db.businessTask.update({where:{id:task.id},data:{assigneeId:owner.id}});
   await flow.getByRole('button',{name:'Обновить маршрут',exact:true}).click();await expect(flow.getByRole('alert')).toContainText('Задача не найдена');await expect(flow.locator('.employee-flow-steps')).toHaveCount(0);

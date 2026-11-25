@@ -36,7 +36,7 @@ test('owner manages sessions and changes password with cookie rotation and trans
  const current=await signIn(context,ownerId);
  const other=await session(ownerId,'<img src=x onerror=alert(1)>');
  await page.goto('/');
- await openManagement(page);await page.getByRole('button',{name:'Настройки',exact:true}).click();
+ await openManagement(page);await page.getByRole('button',{name:'Настройки',exact:true}).click();await page.getByRole('tab',{name:'Доступ',exact:true}).click();
  const security=page.getByRole('region',{name:'Безопасность аккаунта',exact:true});
  await expect(security.locator('.session-card')).toHaveCount(2);
  const otherCard=security.locator('.session-card').filter({hasText:'Неизвестный браузер'});
@@ -97,6 +97,7 @@ test('owner manages sessions and changes password with cookie rotation and trans
  await page.getByRole('button',{name:'Menu',exact:true}).click();
  await openManagement(page,'Management');
  await page.getByRole('button',{name:'Settings',exact:true}).click();
+ await page.getByRole('tab',{name:'Access',exact:true}).click();
  await expect(page.getByText('This session',{exact:true})).toBeVisible();
  await page.getByRole('button',{name:'Sign out here',exact:true}).click();
  await page.getByRole('button',{name:'Confirm',exact:true}).click();
@@ -110,8 +111,8 @@ test('employee opens personal security on mobile and bulk revokes other sessions
  const requests:string[]=[];
  page.on('request',request=>{if(/\/api\/(dashboard|clients|orders|movements|documents|team$|audit)/.test(request.url()))requests.push(request.url());});
  await page.goto('/');
- await page.getByRole('button',{name:'Безопасность аккаунта',exact:true}).click();
- await expect(page.getByRole('heading',{name:'Безопасность аккаунта',level:1})).toBeVisible();
+ await page.getByRole('button',{name:'Настройки аккаунта',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Настройки аккаунта',level:1})).toBeVisible();
  await expect(page.locator('.session-card')).toHaveCount(2);
  await page.getByRole('button',{name:'Завершить другие сеансы',exact:true}).click();
  await page.getByRole('button',{name:'Отмена',exact:true}).click();
@@ -127,7 +128,7 @@ test('employee opens personal security on mobile and bulk revokes other sessions
  await page.screenshot({path:'test-results/employee-security-mobile.png',fullPage:true});
  await page.getByRole('button',{name:'Мои задачи',exact:true}).click();
  await expect(page.getByRole('heading',{name:'Мои задачи',level:1})).toBeVisible();
- await page.getByRole('button',{name:'Безопасность аккаунта',exact:true}).click();
+ await page.getByRole('button',{name:'Настройки аккаунта',exact:true}).click();
  await page.getByRole('button',{name:'Выйти здесь',exact:true}).click();
  await page.getByRole('button',{name:'Подтвердить',exact:true}).click();
  await expect(page.getByRole('heading',{name:'С возвращением'})).toBeVisible();

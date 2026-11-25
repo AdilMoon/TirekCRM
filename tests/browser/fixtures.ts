@@ -7,6 +7,17 @@ export async function openManagement(page: Page, label = 'Управление')
  const group = page.getByRole('button', { name: label, exact: true });
  if (await group.getAttribute('aria-expanded') === 'false') await group.click();
 }
+export async function navigateWorkspace(page:Page,label:string){
+ await page.locator('.owner-navigation:visible,.employee-work-nav:visible,.mobile-menu:visible').first().waitFor({state:'visible'});
+ const menu=page.getByRole('button',{name:'Меню',exact:true});
+ if(await menu.isVisible()&&!await page.locator('.owner-navigation').isVisible())await menu.click();
+ await page.locator('.owner-navigation:visible,.employee-work-nav:visible').first().waitFor({state:'visible'});
+ const owner=page.locator('.owner-navigation');
+ const nav=await owner.isVisible()?owner:page.locator('.employee-work-nav');
+ const target=nav.getByRole('button',{name:label,exact:true});
+ if(!await target.isVisible())await openManagement(page);
+ await target.click();
+}
 
 // The browser suite uses one loopback IP. Wait between scenarios for its real
 // server budget; never intercept, retry or weaken a response within a scenario.

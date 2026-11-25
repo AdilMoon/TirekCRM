@@ -1,3 +1,4 @@
+import {navigateWorkspace} from './fixtures';
 import {openManagement, test, expect } from './fixtures';
 import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
@@ -65,7 +66,7 @@ test('owner can create client, order, partial payment and expense', async ({ pag
   await page.getByRole('button', { name:'Создать акт', exact:true }).click();
   await page.getByRole('button', { name:'Создать черновик', exact:true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  await page.getByRole('button', { name:'Документы', exact:true }).click();
+  await navigateWorkspace(page,'Документы');
   const [documentPage] = await Promise.all([page.waitForEvent('popup'), page.getByRole('link', { name:'Открыть' }).click()]);
   await expect(documentPage.getByRole('heading', { name:'Акт выполненных работ' })).toBeVisible();
   await expect(documentPage.getByText('Черновик · без подписи', { exact:true })).toBeVisible();
@@ -82,7 +83,7 @@ test('mobile overview fits viewport and navigation remains usable', async ({ pag
   await expect(page.getByRole('heading', { name:'Всё под контролем.' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.getByRole('button', { name:'Меню', exact:true }).click();
-  await page.getByRole('button', { name:'Документы', exact:true }).click();
+  await navigateWorkspace(page,'Документы');
   await expect(page.getByRole('heading', { name:'Документы', exact:true })).toBeVisible();
 });
 
@@ -270,7 +271,7 @@ test('financial filters, historical records and complete order pickers work on m
  await page.goto('/');
  await page.getByLabel('Email',{exact:true}).fill(email);await page.getByLabel('Пароль',{exact:true}).fill(password);
  await page.getByRole('button',{name:'Войти в пространство'}).click();
- async function navigate(section:string){await page.getByRole('button',{name:'Меню',exact:true}).click();await page.getByRole('button',{name:section,exact:true}).click();}
+ async function navigate(section:string){await navigateWorkspace(page,section);}
  await navigate('Финансы');
  const filteredMovements=page.waitForResponse(response=>{
   const url=new URL(response.url());

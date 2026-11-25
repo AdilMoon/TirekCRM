@@ -49,7 +49,8 @@ test('mobile navigation is modal, keyboard safe and survives breakpoint changes'
  await expect(drawer).toHaveCount(0);await expect(page.locator('.sidebar')).toBeVisible();
  expect(await page.evaluate(()=>document.body.style.overflow)).not.toBe('hidden');
  await page.setViewportSize({width:320,height:640});await expect(menu).toHaveAttribute('aria-expanded','false');
- await menu.click();await drawer.getByRole('button',{name:'О проекте',exact:true}).click();
+ await menu.click();await drawer.getByRole('button',{name:'Управление',exact:true}).click();await drawer.getByRole('button',{name:'Документы',exact:true}).click();
+ await expect(drawer).toHaveCount(0);await page.getByRole('button',{name:'Создать счёт',exact:true}).click();
  await expect(page.getByRole('dialog')).toHaveCount(1);
  await page.getByRole('button',{name:'Закрыть',exact:true}).click();
  expect(await page.evaluate(()=>document.body.style.overflow)).not.toBe('hidden');
@@ -122,8 +123,8 @@ test('employee phone header keeps actions reachable without owner navigation',as
    const box=await button.boundingBox();expect(box!.height).toBeGreaterThanOrEqual(44);
   }
  }
- await page.getByRole('button',{name:'Account security',exact:true}).click();
- await expect(page.getByRole('heading',{name:'Account security',level:1})).toBeVisible();
+ await page.getByRole('button',{name:'Account settings',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Account settings',level:1})).toBeVisible();
  expect(forbiddenRequests).toEqual([]);
  await page.screenshot({path:'test-results/mobile-employee.png',fullPage:true});
 });

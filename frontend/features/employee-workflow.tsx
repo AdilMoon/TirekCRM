@@ -22,10 +22,12 @@ export function EmployeeFirstDayCard({revision,onChanged,onSessionExpired}:{revi
  const progress=data?.workflow?steps(data.workflow).filter(step=>step.available):[];
  const done=progress.length>0&&progress.every(step=>step.done);
  return <section className={'panel employee-first-day'+(done?' completed':'')} aria-label={t('Первый рабочий день')}>
-  <div className="first-day-heading"><div><p className="eyebrow">{t('Первый рабочий день')}</p><h2>{t(done?'Первый маршрут пройден':'От первой задачи до результата')}</h2></div><span className="first-day-symbol"><CheckCircle2 size={26}/></span></div>
+  {done&&data?.workflow?<div className="first-day-complete-summary"><CheckCircle2 size={26}/><div><h2>{t('Первый маршрут пройден')}</h2><small>{t('Выполнено шагов: {0} из {1}',progress.length,progress.length)}</small></div><button className="text-button" onClick={()=>setOpen(data.workflow!.task.id)}>{t('Открыть пошаговый маршрут')}<ArrowRight size={16}/></button></div>:<>
+  <div className="first-day-heading"><div><p className="eyebrow">{t('Первый рабочий день')}</p><h2>{t('От первой задачи до результата')}</h2></div><span className="first-day-symbol"><CheckCircle2 size={26}/></span></div>
   {error&&<p className="form-error" role="alert">{t(error)}</p>}{!data&&!error&&<p role="status">{t('Загрузка…')}</p>}
   {data?.workflow?<><p>{data.workflow.task.title}</p><div className="first-day-summary"><strong>{t('Выполнено шагов: {0} из {1}',progress.filter(step=>step.done).length,progress.length)}</strong><button className="button primary" onClick={()=>setOpen(data.workflow!.task.id)}>{t('Открыть пошаговый маршрут')}<ArrowRight size={16}/></button></div></>:
    data&&<p>{t('Доступ уже есть. Первая задача появится здесь, когда владелец назначит её вам.')}</p>}
+  </>}
   <button className="text-button" onClick={()=>setAttempt(n=>n+1)}>{t('Обновить маршрут')}</button>
   {open&&<EmployeeTaskFlow key={open} id={open} close={()=>{setOpen('');setAttempt(n=>n+1);onChanged();}} onSessionExpired={onSessionExpired}/>}
  </section>;

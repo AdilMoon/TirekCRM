@@ -1,3 +1,4 @@
+import {navigateWorkspace} from './fixtures';
 import {openManagement,test,expect,type BrowserContext} from './fixtures';
 import 'dotenv/config';
 import {PrismaClient} from '@prisma/client';
@@ -42,7 +43,7 @@ test('requisites, invoice creation, snapshot print and RU KK EN mobile layout',a
  await page.getByRole('button',{name:'Сохранить',exact:true}).click();
  await expect(page.getByRole('dialog')).toHaveCount(0);
  await expect.poll(async()=> (await db.client.findUniqueOrThrow({where:{id:clientId}})).businessId).toBe('987654321098');
- await page.getByRole('button',{name:'Документы',exact:true}).click();
+ await navigateWorkspace(page,'Документы');
  await page.getByRole('button',{name:'Создать счёт',exact:true}).click();
  await page.getByRole('combobox',{name:'Заказ *',exact:true}).selectOption(orderId);
  await expect(page.locator('.invoice-preview')).toContainText('20,01');
@@ -76,7 +77,7 @@ test('requisites, invoice creation, snapshot print and RU KK EN mobile layout',a
 
 test('ambiguous create response and throttled retry keep one immutable request',async({page,context})=>{
  await signIn(context);await page.goto('/');
- await page.getByRole('button',{name:'Документы',exact:true}).click();
+ await navigateWorkspace(page,'Документы');
  await page.getByRole('button',{name:'Создать счёт',exact:true}).click();
  await page.getByRole('combobox',{name:'Заказ *',exact:true}).selectOption(orderId);
  await page.getByLabel('Примечание к счёту',{exact:true}).fill('Original request');
@@ -134,7 +135,7 @@ test('annulment survives lost response, is visible in registry and in RU KK EN p
  await page.setViewportSize({width:794,height:1123});await page.emulateMedia({media:'print'});await expect(page.locator('.document-annulled')).toBeVisible();await expect(page.locator('.document-toolbar')).not.toBeVisible();
  await page.screenshot({path:testInfo.outputPath('annulled-print.png'),fullPage:true});
  await page.emulateMedia({media:'screen'});await page.setViewportSize({width:1280,height:900});await page.goto('/');
- await page.getByRole('button',{name:'Документы',exact:true}).click();
+ await navigateWorkspace(page,'Документы');
  await page.getByRole('combobox',{name:'Статус документа',exact:true}).selectOption('ANNULLED');
  await expect(page.getByRole('cell',{name:'Счёт № 0001 Черновик аннулирован'})).toBeVisible();
  await page.getByRole('combobox',{name:'Статус документа',exact:true}).selectOption('DRAFT');

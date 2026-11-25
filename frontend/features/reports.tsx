@@ -73,7 +73,7 @@ export function FinanceReport({revision,onOrder,onChanged}:{revision:unknown;onO
  {busy&&<Empty>{t('Загрузка…')}</Empty>}{!busy&&!reportError&&!result?.items.length&&<Empty>{t('За выбранный период и с этими фильтрами записей нет.')}</Empty>}
  <Pagination result={result} page={filters.page} setPage={filters.setPage} busy={busy}/>
  <div className="table-footer">{t('Учитываются внесённые записи. Синхронизация с банком не подключена.')}</div></section>
- {selected&&<FinancialOperationDialog key={selected.kind+selected.id} {...selected} onClose={()=>{setSelected(null);retry();}} onSaved={()=>{retry();onChanged();}}/>}
+ {selected&&<FinancialOperationDialog key={selected.kind+selected.id} {...selected} onOrder={onOrder} onExpense={id=>setSelected({id,kind:'EXPENSE'})} onClose={()=>{setSelected(null);retry();}} onSaved={()=>{retry();onChanged();}}/>}
  </div>;
 }
 export function DocumentDirectory({revision}:{revision:unknown}){

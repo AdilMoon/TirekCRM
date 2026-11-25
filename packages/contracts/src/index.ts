@@ -302,6 +302,8 @@ export interface FinancialOperation {
  corrections:{id:string;amount:string;reason:string;actorName:string;createdAt:string}[];
  replacementExpenseId?:string|null;replacesExpenseId?:string|null;
  category?:string;orderId?:string|null;
+ order?:{id:string;number:number;title:string}|null;
+ replacementAllowed?:boolean;
 }
 
 const invalidMessageControl=/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f\ud800-\udfff]/u;

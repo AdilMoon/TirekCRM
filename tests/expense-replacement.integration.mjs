@@ -108,6 +108,9 @@ test('atomic expense replacement preserves history, exact balances and retry bou
       const original = (await req('/finance/expenses/' + a.expense.id, a)).body;
       const replacement = (await req('/finance/expenses/' + first.expense.id, a)).body;
       assert.equal(original.remaining, '0.00'); assert.equal(original.replacementExpenseId, first.expense.id);
+      assert.deepEqual(original.order,{id:a.order.id,number:a.order.number,title:a.order.title});
+      assert.equal(original.replacementAllowed,false);
+      assert.equal(replacement.order,null);assert.equal(replacement.replacementAllowed,true);
       assert.equal(replacement.replacesExpenseId, a.expense.id); assert.equal(replacement.remaining, '12.34');
       assert.deepEqual(await summary(a), { received: '0.00', expenses: '12.34', cashFlow: '-12.34' });
       assert.equal((await req('/dashboard', a)).body.expenses, '12.34');

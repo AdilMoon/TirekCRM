@@ -23,12 +23,12 @@ export class FinanceService {
  async payment(org:string,id:string){
   const row=await this.db.client.payment.findFirst({where:{id,organizationId:org},include:{order:true,refunds:{orderBy:[{createdAt:'desc'},{id:'desc'}]}}});
   if(!row)throw new NotFoundException('Оплата не найдена');
-  return {id:row.id,kind:'INCOME',amount:row.amount.toFixed(2),remaining:money(cents(row.amount.toFixed(2))-row.refunds.reduce((s,r)=>s+cents(r.amount.toFixed(2)),0n)),description:row.note||row.order.title,createdAt:row.createdAt,corrections:row.refunds.map(correction)};
+  return {id:row.id,kind:'INCOME',amount:row.amount.toFixed(2),remaining:money(cents(row.amount.toFixed(2))-row.refunds.reduce((s,r)=>s+cents(r.amount.toFixed(2)),0n)),description:row.note||row.order.title,createdAt:row.createdAt,corrections:row.refunds.map(correction),order:{id:row.order.id,number:row.order.number,title:row.order.title}};
  }
  async expense(org:string,id:string){
-  const row=await this.db.client.expense.findFirst({where:{id,organizationId:org},include:{reversal:true,replaces:true}});
+  const row=await this.db.client.expense.findFirst({where:{id,organizationId:org},include:{reversal:true,replaces:true,order:{select:{id:true,number:true,title:true}},materialLot:{select:{expenseId:true}}}});
   if(!row)throw new NotFoundException('Расход не найден');
-  return {id:row.id,kind:'EXPENSE',amount:row.amount.toFixed(2),remaining:row.reversal?'0.00':row.amount.toFixed(2),description:row.description,category:row.category,orderId:row.orderId,createdAt:row.createdAt,corrections:row.reversal?[correction(row.reversal)]:[],replacementExpenseId:row.reversal?.replacementExpenseId??null,replacesExpenseId:row.replaces?.expenseId??null};
+  return {id:row.id,kind:'EXPENSE',amount:row.amount.toFixed(2),remaining:row.reversal?'0.00':row.amount.toFixed(2),description:row.description,category:row.category,orderId:row.orderId,order:row.order,replacementAllowed:!row.reversal&&!row.materialLot,createdAt:row.createdAt,corrections:row.reversal?[correction(row.reversal)]:[],replacementExpenseId:row.reversal?.replacementExpenseId??null,replacesExpenseId:row.replaces?.expenseId??null};
  }
  async refund(actor:Actor,id:string,input:RefundInput){
   return serializable(this.db.client,async tx=>{

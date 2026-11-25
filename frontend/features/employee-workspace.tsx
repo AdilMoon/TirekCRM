@@ -10,10 +10,12 @@ import { WorkTime } from './work-time';
 import { Brand } from '../components/ui';
 import { useI18n, LanguageSwitcher } from '../i18n/provider';
 import { api } from '../lib/api';
+import {EmployeeFirstDayCard} from './employee-workflow';
 export function EmployeeWorkspace({user,onExit}:{user:SessionUser;onExit:()=>void}) {
  const {t}=useI18n();
  const [error,setError]=useState('');
  const [security,setSecurity]=useState(false);
+ const [taskRevision,setTaskRevision]=useState(0);
  const [section,setSection]=useState<'tasks'|'workTime'>('tasks');
  const heading = section === 'tasks' ? 'Мои задачи' : 'Табель';
  async function logout(){try{await api('/auth/logout',{method:'POST'});onExit();}catch(e){if((e as Error&{status?:number}).status===401)onExit();else setError((e as Error).message);}}
@@ -36,7 +38,7 @@ export function EmployeeWorkspace({user,onExit}:{user:SessionUser;onExit:()=>voi
      <button type="button" className={section==='tasks'?'button primary':'button secondary'} aria-current={section==='tasks'?'page':undefined} onClick={()=>setSection('tasks')}>{t('Мои задачи')}</button>
      <button type="button" className={section==='workTime'?'button primary':'button secondary'} aria-current={section==='workTime'?'page':undefined} onClick={()=>setSection('workTime')}>{t('Табель')}</button>
     </nav>
-    {section==='tasks'?<><TelegramConnect/><Tasks user={user} onSessionExpired={onExit}/></>:<WorkTime owner={false}/>}
+    {section==='tasks'?<><EmployeeFirstDayCard revision={taskRevision} onChanged={()=>setTaskRevision(n=>n+1)} onSessionExpired={onExit}/><Tasks user={user} revision={taskRevision} onSessionExpired={onExit}/><TelegramConnect/></>:<WorkTime owner={false}/>}
    </>}
   </main>
  </div>;

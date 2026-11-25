@@ -5,5 +5,6 @@ import { AuditModule } from '../audit/audit.module';
 import { TasksController } from './tasks.controller';
 import { TasksService } from './tasks.service';
 import { TaskCommentsService } from './task-comments.service';
-@Module({imports:[DatabaseModule,AuthModule,AuditModule],controllers:[TasksController],providers:[TasksService,TaskCommentsService],exports:[TasksService]})
+import {EmployeeWorkflowService} from './employee-workflow.service';
+@Module({imports:[DatabaseModule,AuthModule,AuditModule],controllers:[TasksController],providers:[TasksService,TaskCommentsService,EmployeeWorkflowService],exports:[TasksService]})
 export class TasksModule {}

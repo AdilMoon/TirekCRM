@@ -34,7 +34,7 @@ test('Team permissions, invitations and assigned tasks',async t=>{
   const accepted=await Promise.all([1,2].map(()=>req('/team/invitations/accept',{method:'POST',body:{token:invite.token,password}})));
   assert.deepEqual(accepted.map(r=>r.status).sort(),[201,404]);assert.equal((await req('/team/invitations/preview',{method:'POST',body:{token:invite.token}})).status,404);
   employee=await db.user.findUnique({where:{email}});assert.equal(employee.role,'EMPLOYEE');
-  const login=await req('/auth/login',{method:'POST',body:{email,password}});assert.equal(login.status,201);cookie=login.cookie;
+  cookie=accepted.find(result=>result.status===201).cookie;assert.ok(cookie);
   const me=await req('/auth/me',{cookie});assert.equal(me.body.role,'EMPLOYEE');assert.equal(me.body.id,employee.id);
  });
  await t.test('revoked and expired invitations cannot create accounts',async()=>{

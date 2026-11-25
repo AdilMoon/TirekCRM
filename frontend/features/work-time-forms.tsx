@@ -9,10 +9,11 @@ import { api } from '../lib/api';
 import { almatyDateTime, almatyInstant } from '../lib/work-time-date';
 import { WorkTimeOrderPicker } from './work-time-order-picker';
 
-export function WorkTimeCreate({ people, employee, initialOrder = null, close, saved }: {
+export function WorkTimeCreate({ people, employee, initialOrder = null, fixedOrder = false, close, saved }: {
   people?: WorkTimePerson[];
   employee: string;
   initialOrder?: WorkTimeOrder | null;
+  fixedOrder?: boolean;
   close: () => void;
   saved: (month: string) => void;
 }) {
@@ -59,12 +60,12 @@ export function WorkTimeCreate({ people, employee, initialOrder = null, close, s
       </label>}
       <label>{t('Вид времени')}
         <select value={kind} disabled={busy} onChange={event => { setKind(event.target.value as WorkTimeKind); pending.current = null; }}>
-          {workTimeKinds.map(value => <option key={value} value={value}>{t(workTimeKindLabels[value])}</option>)}
+          {workTimeKinds.filter(value=>!fixedOrder||value!=='ABSENCE').map(value => <option key={value} value={value}>{t(workTimeKindLabels[value])}</option>)}
         </select>
       </label>
-      {kind !== 'ABSENCE' && <WorkTimeOrderPicker value={order} disabled={busy} onChange={value => {
+      {kind !== 'ABSENCE' && (fixedOrder&&order?<p className="form-note">{t('Заказ № {0}',order.number)} · {order.title}</p>:<WorkTimeOrderPicker value={order} disabled={busy} onChange={value => {
         setOrder(value); pending.current = null;
-      }}/>}
+      }}/>)}
       <Field label={t('Фактическое начало (Алматы)')} type="datetime-local" required step={60} max={almatyDateTime(new Date())}
         value={start} disabled={busy} onChange={event => { setStart(event.target.value); pending.current = null; }}/>
       <Field label={t('Фактическое окончание (Алматы)')} type="datetime-local" required step={60} max={almatyDateTime(new Date())}

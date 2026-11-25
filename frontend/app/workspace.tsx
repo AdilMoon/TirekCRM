@@ -142,7 +142,7 @@ const navigation = [
       {section === 'orders' && <OrderDirectory key={String(attentionRequested)} revision={data} onSelect={openOrder} initialAttention={attentionRequested}/>}
       {section === 'clients' && <ClientDirectory revision={data} onSelect={client=>setModal({kind:'client',client})}/>}
       {section === 'tasks' && <Tasks user={user}/>}
-      {section === 'team' && <Team/>}
+      {section === 'team' && <Team user={user}/>}
       {section === 'workTime' && <WorkTime owner/>}
       {section === 'history' && <AuditTrail revision={data}/>}
       {section === 'finances' && <FinanceReport revision={data} onChanged={()=>{refresh().catch(e=>setError(e.message));}} onOrder={id=>openOrder({id})}/>}

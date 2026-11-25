@@ -9,7 +9,7 @@ import { publishTaskNotification,removeFormerAssigneeNotifications } from '../no
 import {requireAcceptance,readAcceptance,checkAcceptance} from './acceptance';
 type Actor=AuthRequest['user'];
 // Deliberately select only operational fields: employees never receive financial or client data.
-const taskSelect={id:true,title:true,description:true,status:true,version:true,dueDate:true,createdAt:true,updatedAt:true,
+export const taskSelect={id:true,title:true,description:true,status:true,version:true,dueDate:true,createdAt:true,updatedAt:true,
  booking:{select:{startsAt:true,endsAt:true,releasedAt:true}},
  assignee:{select:{id:true,name:true,isActive:true}},order:{select:{id:true,number:true,title:true}}} as const;
 @Injectable()

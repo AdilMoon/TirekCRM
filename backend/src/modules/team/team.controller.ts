@@ -1,4 +1,7 @@
-import { Controller, Get, Post, Patch, Body, Req, Param, ParseUUIDPipe, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Req, Res, Param, ParseUUIDPipe, UseGuards } from '@nestjs/common';
+import type {FastifyReply} from 'fastify';
+import {setSessionCookie} from '../../auth/session';
+import {cleanUserAgent} from '../../auth/auth.service';
 import { RouteConfig } from '@nestjs/platform-fastify';
 import { invitationSchema, invitationTokenSchema, acceptInvitationSchema, memberAccessSchema } from '@tirek/contracts';
 import { AuthRequest, SessionGuard } from '../../auth/session.guard';
@@ -19,5 +22,9 @@ export class TeamController {
  @PublicAccess()
  @Post('invitations/accept')
  @RouteConfig({rateLimit:{max:10,timeWindow:'1 minute'}})
- accept(@Body() body:unknown){const input=acceptInvitationSchema.parse(body);return this.team.accept(input.token,input.password);}
+ async accept(@Body() body:unknown,@Req() req:AuthRequest,@Res({passthrough:true}) reply:FastifyReply){
+  const input=acceptInvitationSchema.parse(body);
+  const result=await this.team.accept(input.token,input.password,cleanUserAgent(req.headers['user-agent']),req.cookies?.tirek_session);
+  setSessionCookie(reply,result.session);return {ok:true,email:result.email};
+ }
 }

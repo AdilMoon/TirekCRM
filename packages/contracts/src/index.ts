@@ -7,6 +7,7 @@ export * from './order-profitability';
 export * from './acceptance';
 export * from './order-attention';
 export * from './service-objects';
+export * from './employee-workflow';
 
 export const stages = ['NEW', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'] as const;
 export type Stage = typeof stages[number];

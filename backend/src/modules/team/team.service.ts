@@ -4,6 +4,7 @@ import type { InvitationInput } from '@tirek/contracts';
 import { Database } from '../../database/database.service';
 import { AuditService, Actor } from '../audit/audit.service';
 import { digest, hashPassword } from '../../auth/session.guard';
+import {createSession} from '../../auth/session';
 import { serializable } from '../../common/transaction';
 const memberSelect={id:true,name:true,email:true,role:true,isActive:true,version:true} as const;
 const invitationSelect={id:true,name:true,email:true,expiresAt:true,acceptedAt:true,revokedAt:true,createdAt:true} as const;
@@ -44,17 +45,20 @@ export class TeamService {
   if(!invite||invite.acceptedAt||invite.revokedAt||invite.expiresAt<=new Date())throw new NotFoundException('Приглашение недействительно или истекло');
   return {name:invite.name,email:invite.email,organization:invite.organization.name,expiresAt:invite.expiresAt};
  }
- async accept(token:string,password:string) {
+ async accept(token:string,password:string,userAgent='',currentToken?:string) {
   await this.preview(token);
   const passwordHash=await hashPassword(password);
   return serializable(this.db.client,async tx=>{
+   if(currentToken&&/^[a-f0-9]{64}$/.test(currentToken)&&await tx.session.findFirst({where:{tokenHash:digest(currentToken),expiresAt:{gt:new Date()},user:{isActive:true}},select:{id:true}}))
+    throw new ConflictException('Сначала выйдите из текущего аккаунта, чтобы принять приглашение');
    const invite=await tx.invitation.findUnique({where:{tokenHash:digest(token)}});
    if(!invite||invite.acceptedAt||invite.revokedAt||invite.expiresAt<=new Date())throw new NotFoundException('Приглашение недействительно или истекло');
    if(await tx.user.findUnique({where:{email:invite.email}}))throw new ConflictException('Этот email уже используется');
    const user=await tx.user.create({data:{email:invite.email,name:invite.name,passwordHash,organizationId:invite.organizationId,role:'EMPLOYEE'}});
    await tx.invitation.update({where:{id:invite.id},data:{acceptedAt:new Date()}});
    await this.audit.record(tx,user,'TEAM',user.id,'MEMBER_JOINED',{name:user.name});
-   return {ok:true,email:user.email};
+   const session=await createSession(tx,user.id,userAgent);
+   return {ok:true,email:user.email,session};
   });
  }
  access(actor:Actor,id:string,input:{isActive:boolean;version:number}) {

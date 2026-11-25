@@ -19,10 +19,10 @@ async function compressPhoto(file:File){
   throw new Error('Фото слишком большое после обработки');
  }finally{URL.revokeObjectURL(url);}
 }
-export function OrderPassportManager({id,close}:{id:string;close:()=>void}){
+export function OrderPassportManager({id,close,initialPhase='BEFORE',resultOnly=false,onPhotoSaved}:{id:string;close:()=>void;initialPhase?:'BEFORE'|'AFTER';resultOnly?:boolean;onPhotoSaved?:()=>void}){
  const {t,formatDate}=useI18n();
  const [data,setData]=useState<OrderPassport|null>(null),[link,setLink]=useState<PassportLinkResult|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false);
- const [phase,setPhase]=useState('BEFORE'),[file,setFile]=useState<File|null>(null),[retry,setRetry]=useState(0);
+ const [phase,setPhase]=useState<string>(initialPhase),[file,setFile]=useState<File|null>(null),[retry,setRetry]=useState(0);
  const [review,setReview]=useState<{id:string;orderVersion:number}|null>(null);
  const [approved,setApproved]=useState(false);
  const photoRequest=useRef<{image:string;phase:string;shared:false;idempotencyKey:string}|null>(null);
@@ -30,12 +30,13 @@ export function OrderPassportManager({id,close}:{id:string;close:()=>void}){
  const passportPath='/orders/'+id+'/passport';
  useEffect(()=>{let active=true;setData(null);setError('');api<OrderPassport>(passportPath).then(v=>{if(active)setData(v);}).catch(e=>{if(active)setError(e.message);});return()=>{active=false;};},[passportPath,retry]);
  async function action(fn:()=>Promise<unknown>){setBusy(true);setError('');try{await fn();setData(await api<OrderPassport>('/orders/'+id+'/passport'));}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
- async function upload(e:FormEvent){e.preventDefault();if(!file)return;await action(async()=>{
+ async function upload(e:FormEvent){e.preventDefault();if(!file)return;let uploaded=false;await action(async()=>{
   if(!photoRequest.current)photoRequest.current={image:await compressPhoto(file),phase,shared:false,idempotencyKey:crypto.randomUUID()};
   await api(passportPath+'/photos',{method:'POST',body:JSON.stringify(photoRequest.current)});
+  uploaded=true;
   photoRequest.current=null;setFile(null);
   if(fileInput.current)fileInput.current.value='';
- });}
+ });if(uploaded)onPhotoSaved?.();}
  function setVisibility(photoId:string,shared:boolean,orderVersion:number){
   setReview(null);
   setApproved(false);
@@ -44,8 +45,8 @@ export function OrderPassportManager({id,close}:{id:string;close:()=>void}){
   }));
  }
  const photoCount=data?.photoCount??data?.photos.length??0;
- return <ModalShell title={t('QR-паспорт заказа')} onClose={close} busy={busy} className="passport-modal">
-  <p className="form-note">{t('По ссылке видны название, статус, срок и выбранные фото. Ссылку сможет открыть любой, у кого она есть.')}</p>
+ return <ModalShell title={t(resultOnly?'Фото результата':'QR-паспорт заказа')} onClose={close} busy={busy} className="passport-modal">
+  <p className="form-note">{t(resultOnly?'Снимите результат. Фото сохранится в CRM, публикацией управляет владелец.':'По ссылке видны название, статус, срок и выбранные фото. Ссылку сможет открыть любой, у кого она есть.')}</p>
   {data?.canPublish&&<p className="form-note">{t('В завершённом заказе с объектом получатель ссылки также может отправить обращение на обслуживание.')}</p>}
   {error&&<p className="form-error" role="alert">{t(error)} <button className="text-button" disabled={busy} onClick={()=>{setReview(null);setApproved(false);setRetry(v=>v+1);}}>{t('Обновить')}</button></p>}
   {!data?(!error&&<p role="status">{t('Загрузка…')}</p>):<>
@@ -88,7 +89,7 @@ export function OrderPassportManager({id,close}:{id:string;close:()=>void}){
     </div>}
     {photoCount<6&&<form className="editor-form passport-upload" onSubmit={upload}>
      <div className="form-row">
-      <label>{t('Этап фото')}<select aria-label={t('Этап фото')} value={phase} disabled={busy} onChange={e=>{setPhase(e.target.value);photoRequest.current=null;}}><option value="BEFORE">{t('До выполнения')}</option><option value="AFTER">{t('После выполнения')}</option></select></label>
+      {!resultOnly&&<label>{t('Этап фото')}<select aria-label={t('Этап фото')} value={phase} disabled={busy} onChange={e=>{setPhase(e.target.value);photoRequest.current=null;}}><option value="BEFORE">{t('До выполнения')}</option><option value="AFTER">{t('После выполнения')}</option></select></label>}
       <label>{t('Фотография')}<input ref={fileInput} type="file" accept="image/jpeg,image/png,image/webp" disabled={busy} onChange={e=>{setFile(e.target.files?.[0]??null);photoRequest.current=null;}}/></label>
      </div>
      <button className="button secondary" disabled={busy||!file}>{busy?<LoaderCircle size={16} className="spin"/>:<Upload size={16}/>} {t('Загрузить фото')}</button>

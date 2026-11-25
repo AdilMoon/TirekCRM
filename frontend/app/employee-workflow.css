@@ -1,0 +1,16 @@
+.employee-first-day {padding:24px;margin-bottom:22px;border-color:#bddcd1;background:linear-gradient(120deg,#eef8f3,#fff)}
+.first-day-heading,.first-day-summary {display:flex;justify-content:space-between;align-items:center;gap:20px}
+.first-day-heading h2 {font-size:22px;margin:8px 0}.first-day-symbol {color:var(--green,#226b57)}
+.employee-first-day>p {line-height:1.6;overflow-wrap:anywhere}.first-day-summary {margin:18px 0}
+.employee-first-day.completed {background:#f5f9f7}.employee-first-day>.text-button {margin-top:8px}
+.employee-flow-modal {width:min(760px,calc(100% - 24px))}
+.employee-flow-brief {padding:20px;border-radius:14px;background:#f3f8f6;margin-bottom:20px;overflow-wrap:anywhere}
+.employee-flow-brief h3 {font-size:20px;margin:0 0 12px}.employee-flow-brief p {white-space:pre-wrap;line-height:1.7}
+.employee-flow-brief small,.employee-flow-steps p {color:var(--muted);font-size:13px;line-height:1.7}
+.employee-flow-steps {list-style:none;padding:0;margin:24px 0;display:grid;gap:16px}
+.employee-flow-steps>li {display:flex;gap:16px;border:1px solid var(--line);padding:18px;border-radius:14px}
+.employee-flow-steps>li>div {flex:1;min-width:0;overflow-wrap:anywhere}
+.employee-step-number {display:grid;place-items:center;flex:0 0 32px;width:32px;height:32px;border-radius:50%;background:#edf1f3;color:#4c6470;font-weight:700}
+.employee-flow-steps>.done {border-color:#bddcd1;background:#f6faf8}.done .employee-step-number {background:#216b57;color:#fff}
+.employee-flow-steps>.unavailable {background:#f8fafb}.employee-flow-steps .button {margin-top:6px}
+@media(max-width:600px){.employee-first-day {padding:18px}.first-day-heading,.first-day-summary {align-items:flex-start}.first-day-summary {flex-direction:column}.first-day-summary .button {width:100%}.employee-flow-steps>li {padding:14px;gap:10px}.employee-flow-steps .button {width:100%}.first-day-heading h2 {font-size:20px}}

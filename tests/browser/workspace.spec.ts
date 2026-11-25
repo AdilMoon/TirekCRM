@@ -219,11 +219,7 @@ test('owner invites an employee, assigns work and revokes access on mobile', asy
   await expect(employeePage.getByText(employeeEmail,{exact:true})).toBeVisible();
   await employeePage.getByLabel('Новый пароль',{exact:true}).fill(password);
   await employeePage.getByLabel('Повторите пароль',{exact:true}).fill(password);
-  await employeePage.getByRole('button',{name:'Принять приглашение',exact:true}).click();
-  await employeePage.getByRole('link',{name:'Перейти ко входу'}).click();
-  await expect(employeePage.getByLabel('Email',{exact:true})).toHaveValue(employeeEmail);
-  await employeePage.getByLabel('Пароль',{exact:true}).fill(password);
-  await employeePage.getByRole('button',{name:'Войти в пространство'}).click();
+  await employeePage.getByRole('button',{name:'Принять приглашение и открыть задачи',exact:true}).click();
   await expect(employeePage.getByRole('heading',{name:'Мои задачи',level:1})).toBeVisible();
   await expect(employeePage.getByRole('button',{name:'Финансы',exact:true})).toHaveCount(0);
   expect(failedOwnerRequests).toEqual([]);

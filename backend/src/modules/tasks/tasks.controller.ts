@@ -5,10 +5,15 @@ import { EmployeeAccess } from '../../auth/access';
 import { TasksService } from './tasks.service';
 import { TaskCommentsService } from './task-comments.service';
 import { RouteConfig } from '@nestjs/platform-fastify';
+import {EmployeeWorkflowService} from './employee-workflow.service';
 @Controller('tasks')
 @UseGuards(SessionGuard)
 export class TasksController {
- constructor(private readonly tasks:TasksService,private readonly comments:TaskCommentsService){}
+ constructor(private readonly tasks:TasksService,private readonly comments:TaskCommentsService,private readonly workflow:EmployeeWorkflowService){}
+ @EmployeeAccess() @Get('first-day')
+ firstDay(@Req() req:AuthRequest){return this.workflow.first(req.user);}
+ @EmployeeAccess() @Get(':id/workflow')
+ workflowDetail(@Req() req:AuthRequest,@Param('id',new ParseUUIDPipe()) id:string){return this.workflow.detail(req.user,id);}
  @EmployeeAccess() @Get(':id/comments') @Header('Cache-Control','no-store')
  commentsList(@Req() req:AuthRequest,@Param('id',new ParseUUIDPipe()) id:string,@Query() query:unknown){
   return this.comments.list(req.user,id,taskCommentQuerySchema.parse(query));
